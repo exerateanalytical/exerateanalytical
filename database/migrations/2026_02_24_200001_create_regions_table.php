@@ -15,13 +15,17 @@ return new class extends Migration
             $table->integer('administrative_level')->default(1);
             $table->integer('population')->default(0);
             $table->decimal('area_km2', 12, 4)->default(0);
-            $table->foreignUuid('parent_region_id')->nullable()->constrained('regions')->nullOnDelete();
+            $table->uuid('parent_region_id')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
             $table->index('country_id');
             $table->index('parent_region_id');
             $table->index(['country_id', 'administrative_level']);
+        });
+
+        Schema::table('regions', function (Blueprint $table) {
+            $table->foreign('parent_region_id')->references('id')->on('regions')->nullOnDelete();
         });
     }
 
