@@ -92,7 +92,6 @@ describe('POST /api/v1/governance/{country}/{year}/recalculate', function () {
             ->postJson("/api/v1/governance/{$this->country->id}/2023/recalculate");
 
         // The route should be accessible (not 401 or 403)
-        $response->assertStatus(fn ($status) => $status !== 401 && $status !== 403);
         expect($response->getStatusCode())->not->toBe(401);
         expect($response->getStatusCode())->not->toBe(403);
     });
