@@ -144,7 +144,7 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Features::registration(), // Disabled: accounts created by SuperAdmin only
         Features::resetPasswords(),
         // Features::emailVerification(),
         Features::updateProfileInformation(),

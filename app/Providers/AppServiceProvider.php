@@ -7,6 +7,7 @@ use App\Models\Institution;
 use App\Models\Region;
 use App\Observers\CountryObserver;
 use App\Observers\InstitutionObserver;
+use App\Observers\RegionObserver;
 use App\Policies\CountryPolicy;
 use App\Policies\InstitutionPolicy;
 use App\Policies\RegionPolicy;
@@ -46,6 +47,7 @@ class AppServiceProvider extends ServiceProvider
         // Register model observers
         Country::observe(CountryObserver::class);
         Institution::observe(InstitutionObserver::class);
+        Region::observe(RegionObserver::class);
 
         // Register policies
         Gate::policy(Country::class, CountryPolicy::class);
