@@ -32,6 +32,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CountryRepositoryInterface::class, CountryRepository::class);
         $this->app->bind(RegionRepositoryInterface::class, RegionRepository::class);
         $this->app->bind(InstitutionRepositoryInterface::class, InstitutionRepository::class);
+
+        if (class_exists(\Laravel\Telescope\TelescopeApplicationServiceProvider::class)) {
+            $this->app->register(\App\Providers\TelescopeServiceProvider::class);
+        }
     }
 
     /**
