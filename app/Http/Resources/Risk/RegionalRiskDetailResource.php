@@ -18,8 +18,11 @@ class RegionalRiskDetailResource extends JsonResource
             'volatility_index'    => $this->resource['volatility_index'],
             'acceleration'        => $this->resource['acceleration'],
             'stability_label'     => $this->resource['stability_label'],
-            'fragility_index'     => $this->resource['fragility_index'],
-            'fragility_label'     => $this->resource['fragility_label'],
+            'fragility_index'                => $this->resource['fragility_index'],
+            'fragility_label'                => $this->resource['fragility_label'],
+            'risk_delta_from_national'       => $this->resource['risk_delta_from_national'],
+            'fragility_delta_from_national'  => $this->resource['fragility_delta_from_national'],
+            'divergence_label'               => $this->resource['divergence_label'],
         ];
     }
 }

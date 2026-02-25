@@ -46,20 +46,23 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
 
         if ($allSignals->isEmpty()) {
             return [
-                'regional_risk_score' => 0.0,
-                'risk_level'          => 'low',
-                'trend'               => 'stable',
-                'domain_averages'     => [
+                'regional_risk_score'        => 0.0,
+                'risk_level'                 => 'low',
+                'trend'                      => 'stable',
+                'domain_averages'            => [
                     'governance'     => 0.0,
                     'fiscal'         => 0.0,
                     'accountability' => 0.0,
                 ],
-                'signal_count'        => 0,
-                'volatility_index'    => 0.0,
-                'acceleration'        => 0.0,
-                'stability_label'     => 'stable',
-                'fragility_index'     => 0.0,
-                'fragility_label'     => 'resilient',
+                'signal_count'               => 0,
+                'volatility_index'           => 0.0,
+                'acceleration'               => 0.0,
+                'stability_label'            => 'stable',
+                'fragility_index'            => 0.0,
+                'fragility_label'            => 'resilient',
+                'risk_delta_from_national'       => 0.0,
+                'fragility_delta_from_national'  => 0.0,
+                'divergence_label'               => 'aligned',
             ];
         }
 
@@ -73,22 +76,38 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
             $volatilityMetrics['acceleration']
         );
 
+        $national       = $this->getNationalRiskSummary($countryId);
+        $riskDelta      = round($score - $national['national_risk_score'], 2);
+        $fragilityDelta = round($fragilityMetrics['fragility_index'] - $national['fragility_index'], 2);
+
         return [
-            'regional_risk_score' => $score,
-            'risk_level'          => $level,
-            'trend'               => $trend,
-            'domain_averages'     => [
+            'regional_risk_score'            => $score,
+            'risk_level'                     => $level,
+            'trend'                          => $trend,
+            'domain_averages'                => [
                 'governance'     => round($this->domainAvg($domains['governance']), 2),
                 'fiscal'         => round($this->domainAvg($domains['fiscal']), 2),
                 'accountability' => round($this->domainAvg($domains['accountability']), 2),
             ],
-            'signal_count'        => $allSignals->count(),
-            'volatility_index'    => $volatilityMetrics['volatility_index'],
-            'acceleration'        => $volatilityMetrics['acceleration'],
-            'stability_label'     => $volatilityMetrics['stability_label'],
-            'fragility_index'     => $fragilityMetrics['fragility_index'],
-            'fragility_label'     => $fragilityMetrics['fragility_label'],
+            'signal_count'                   => $allSignals->count(),
+            'volatility_index'               => $volatilityMetrics['volatility_index'],
+            'acceleration'                   => $volatilityMetrics['acceleration'],
+            'stability_label'                => $volatilityMetrics['stability_label'],
+            'fragility_index'                => $fragilityMetrics['fragility_index'],
+            'fragility_label'                => $fragilityMetrics['fragility_label'],
+            'risk_delta_from_national'       => $riskDelta,
+            'fragility_delta_from_national'  => $fragilityDelta,
+            'divergence_label'               => $this->deriveDivergenceLabel($fragilityDelta),
         ];
+    }
+
+    private function deriveDivergenceLabel(float $fragilityDelta): string
+    {
+        return match (true) {
+            abs($fragilityDelta) <= 5  => 'aligned',
+            abs($fragilityDelta) <= 15 => 'elevated',
+            default                    => 'structural_hotspot',
+        };
     }
 
     private function collectRegionalDomains(string $countryId, string $regionId, Carbon $windowStart): array
