@@ -265,6 +265,129 @@ class RiskIntelligenceService
         ];
     }
 
+    public function simulateCrossCountryShock(
+        string $originCountryId,
+        array $countryExposureMatrix,
+        float $originShockPercent,
+        float $globalContagionFactor
+    ): array {
+        // Step a: clamp globalContagionFactor to [0, 1]
+        $globalContagionFactor = min(1.0, max(0.0, $globalContagionFactor));
+
+        // Step b: origin baseline (from cache)
+        $originBaseline     = $this->getNationalRiskSummary($originCountryId);
+        $originBaselineRisk = $originBaseline['national_risk_score'];
+
+        // Step c: origin post-shock — all regions shocked equally at originShockPercent
+        $originShock     = $this->computeNationalShock($originCountryId, $originShockPercent);
+        $originPostShock = $originShock['post_shock_risk'];
+        $originDelta     = $originShock['risk_delta'];
+
+        // Step d: propagate shock to each exposed country
+        $countryImpacts    = [];
+        $allPostShockRisks = [$originPostShock];
+        $allRiskDeltas     = [$originDelta];
+
+        foreach ($countryExposureMatrix as $countryId => $exposureWeight) {
+            $exposureWeight         = min(1.0, max(0.0, (float) $exposureWeight));
+            $propagatedShockPercent = $originShockPercent * $exposureWeight * $globalContagionFactor;
+
+            $countryShock = $this->computeNationalShock($countryId, $propagatedShockPercent);
+
+            $countryImpacts[$countryId] = [
+                'baseline_risk'            => $countryShock['baseline_risk'],
+                'post_shock_risk'          => $countryShock['post_shock_risk'],
+                'risk_delta'               => $countryShock['risk_delta'],
+                'propagated_shock_percent' => round($propagatedShockPercent, 2),
+            ];
+
+            $allPostShockRisks[] = $countryShock['post_shock_risk'];
+            $allRiskDeltas[]     = $countryShock['risk_delta'];
+        }
+
+        // Step e: global aggregate metrics
+        $totalCountries          = count($allPostShockRisks);
+        $globalSystemicRiskDelta = $totalCountries > 0
+            ? round(array_sum($allRiskDeltas) / $totalCountries, 2)
+            : 0.0;
+
+        $globalInstabilityIndex = 0.0;
+        if ($totalCountries > 0) {
+            $mean     = array_sum($allPostShockRisks) / $totalCountries;
+            $variance = array_sum(array_map(fn ($v) => ($v - $mean) ** 2, $allPostShockRisks)) / $totalCountries;
+            $globalInstabilityIndex = round(sqrt($variance), 2);
+        }
+
+        return [
+            'origin_baseline_risk'       => $originBaselineRisk,
+            'origin_post_shock_risk'     => $originPostShock,
+            'origin_risk_delta'          => $originDelta,
+            'country_impacts'            => $countryImpacts,
+            'global_systemic_risk_delta' => $globalSystemicRiskDelta,
+            'global_instability_index'   => $globalInstabilityIndex,
+        ];
+    }
+
+    private function computeNationalShock(string $countryId, float $shockPercent): array
+    {
+        $national         = $this->getNationalRiskSummary($countryId);
+        $baselineNational = $national['national_risk_score'];
+
+        $windowStart   = Carbon::now()->subMonths(12);
+        $baselinePool  = [];
+        $postShockPool = [];
+
+        foreach (Region::where('country_id', $countryId)->get() as $region) {
+            $rDomains       = $this->collectRegionalDomainsForConcentration($countryId, $region->id, $windowStart);
+            $rScore         = round($this->weightedScore($rDomains), 2);
+            $monthlyHistory = $this->computeMonthlyScores($rDomains);
+            $rVolMetrics    = $this->computeVolatilityMetrics($monthlyHistory);
+            $rFragility     = $this->computeFragilityMetrics(
+                $rScore,
+                $rVolMetrics['volatility_index'],
+                $rVolMetrics['acceleration']
+            )['fragility_index'];
+
+            $baselinePool[] = $rFragility;
+
+            // Shock all regions equally: last 3 months
+            $shockedHistory = $monthlyHistory;
+            $n              = count($shockedHistory);
+
+            for ($i = max(0, $n - 3); $i < $n; $i++) {
+                $shockedHistory[$i]['weighted_score'] = round(
+                    min(100.0, $shockedHistory[$i]['weighted_score'] * (1 + $shockPercent / 100)),
+                    2
+                );
+            }
+
+            $shockedScores  = array_column($shockedHistory, 'weighted_score');
+            $postShockScore = count($shockedScores) >= 3
+                ? round(array_sum(array_slice($shockedScores, -3)) / 3, 2)
+                : $rScore;
+            $shockedVol     = $this->computeVolatilityMetrics($shockedHistory);
+            $postFragility  = $this->computeFragilityMetrics(
+                $postShockScore,
+                $shockedVol['volatility_index'],
+                $shockedVol['acceleration']
+            )['fragility_index'];
+
+            $postShockPool[] = $postFragility;
+        }
+
+        $poolCount    = count($baselinePool);
+        $poolMeanShift = $poolCount > 0
+            ? (array_sum($postShockPool) - array_sum($baselinePool)) / $poolCount
+            : 0.0;
+        $postShockNational = round(min(100.0, max(0.0, $baselineNational + $poolMeanShift)), 2);
+
+        return [
+            'baseline_risk'  => $baselineNational,
+            'post_shock_risk' => $postShockNational,
+            'risk_delta'     => round($postShockNational - $baselineNational, 2),
+        ];
+    }
+
     private function computeSummary(string $countryId): array
     {
         $windowStart = Carbon::now()->subMonths(12);
