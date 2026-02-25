@@ -16,6 +16,8 @@ class RiskIntelligenceResource extends JsonResource
             'active_categories'   => $this->resource['active_categories'],
             'signal_count'        => $this->resource['signal_count'],
             'last_updated'        => $this->resource['last_updated'],
+            'confidence'          => $this->resource['confidence'],
+            'executive_summary'   => $this->resource['executive_summary'],
         ];
     }
 }

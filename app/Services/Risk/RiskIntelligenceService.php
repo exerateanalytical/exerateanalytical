@@ -6,6 +6,7 @@ use App\Models\FiscalRiskSignal;
 use App\Models\RiskSignal;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class RiskIntelligenceService
 {
@@ -24,6 +25,15 @@ class RiskIntelligenceService
 
     public function getNationalRiskSummary(string $countryId): array
     {
+        return Cache::remember(
+            "risk:intelligence:{$countryId}",
+            900,
+            fn () => $this->computeSummary($countryId)
+        );
+    }
+
+    private function computeSummary(string $countryId): array
+    {
         $windowStart = Carbon::now()->subMonths(12);
         $domains     = $this->collectDomains($countryId, $windowStart);
 
@@ -39,25 +49,33 @@ class RiskIntelligenceService
                 'active_categories'   => [],
                 'signal_count'        => 0,
                 'last_updated'        => null,
+                'confidence'          => 'low',
+                'executive_summary'   => 'National risk posture is LOW and stable. Insufficient signal data for domain attribution.',
             ];
         }
 
         $nationalRiskScore = round($this->weightedScore($domains), 2);
+        $riskLevel         = $this->deriveRiskLevel($nationalRiskScore);
+        $trend             = $this->computeTrend($domains);
+        $activeCategories  = collect(['accountability', 'fiscal', 'governance'])
+            ->filter(fn ($domain) => $domains[$domain]->isNotEmpty())
+            ->values()
+            ->all();
+        $signalCount       = $allSignals->count();
 
         return [
             'national_risk_score' => $nationalRiskScore,
-            'risk_level'          => $this->deriveRiskLevel($nationalRiskScore),
-            'trend'               => $this->computeTrend($domains),
-            'active_categories'   => collect(['accountability', 'fiscal', 'governance'])
-                ->filter(fn ($domain) => $domains[$domain]->isNotEmpty())
-                ->values()
-                ->all(),
-            'signal_count'        => $allSignals->count(),
+            'risk_level'          => $riskLevel,
+            'trend'               => $trend,
+            'active_categories'   => $activeCategories,
+            'signal_count'        => $signalCount,
             'last_updated'        => $allSignals
                 ->pluck('triggered_at')
                 ->filter()
                 ->max()
                 ?->toIso8601String(),
+            'confidence'          => $signalCount >= 3 ? 'normal' : 'low',
+            'executive_summary'   => $this->buildExecutiveSummary($riskLevel, $trend, $activeCategories),
         ];
     }
 
@@ -162,5 +180,34 @@ class RiskIntelligenceService
         }
 
         return 'stable';
+    }
+
+    private function buildExecutiveSummary(string $riskLevel, string $trend, array $activeCategories): string
+    {
+        $level = strtoupper($riskLevel);
+
+        if (empty($activeCategories)) {
+            return "National risk posture is {$level} and {$trend}. Insufficient signal data for domain attribution.";
+        }
+
+        $ordered = collect($activeCategories)
+            ->sortByDesc(fn ($d) => self::DOMAIN_WEIGHTS[$d] ?? 0)
+            ->values()
+            ->all();
+
+        $categoryList = $this->formatCategoryList($ordered);
+
+        return "National risk posture is {$level} and {$trend}, driven primarily by {$categoryList} signals.";
+    }
+
+    private function formatCategoryList(array $items): string
+    {
+        if (count($items) === 1) {
+            return $items[0];
+        }
+
+        $last = array_pop($items);
+
+        return implode(', ', $items) . ' and ' . $last;
     }
 }

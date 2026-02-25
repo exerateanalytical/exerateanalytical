@@ -3,12 +3,16 @@
 namespace App\Providers;
 
 use App\Models\Country;
+use App\Models\FiscalRiskSignal;
 use App\Models\Institution;
 use App\Models\Region;
+use App\Models\RiskSignal;
 use App\Models\ServiceAccessRecord;
 use App\Observers\CountryObserver;
+use App\Observers\FiscalRiskSignalObserver;
 use App\Observers\InstitutionObserver;
 use App\Observers\RegionObserver;
+use App\Observers\RiskSignalObserver;
 use App\Policies\CountryPolicy;
 use App\Policies\DevelopmentPolicy;
 use App\Policies\InstitutionPolicy;
@@ -48,8 +52,10 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register model observers
         Country::observe(CountryObserver::class);
+        FiscalRiskSignal::observe(FiscalRiskSignalObserver::class);
         Institution::observe(InstitutionObserver::class);
         Region::observe(RegionObserver::class);
+        RiskSignal::observe(RiskSignalObserver::class);
 
         // Register policies
         Gate::policy(Country::class, CountryPolicy::class);
