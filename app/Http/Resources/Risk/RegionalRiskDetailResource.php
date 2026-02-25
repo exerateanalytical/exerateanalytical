@@ -23,6 +23,9 @@ class RegionalRiskDetailResource extends JsonResource
             'risk_delta_from_national'       => $this->resource['risk_delta_from_national'],
             'fragility_delta_from_national'  => $this->resource['fragility_delta_from_national'],
             'divergence_label'               => $this->resource['divergence_label'],
+            'projected_regional_risk_3m'     => $this->resource['projected_regional_risk_3m'],
+            'projection_confidence'          => $this->resource['projection_confidence'],
+            'projection_trend'               => $this->resource['projection_trend'],
         ];
     }
 }

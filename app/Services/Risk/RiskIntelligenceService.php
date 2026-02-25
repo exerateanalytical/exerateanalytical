@@ -99,6 +99,9 @@ class RiskIntelligenceService
                 'risk_concentration_index' => 0.0,
                 'concentration_label'      => 'evenly_distributed',
                 'top_20_percent_share'     => 0.0,
+                'projected_risk_3m'        => 0.0,
+                'projection_confidence'    => 'low',
+                'projection_trend'         => 'stable',
             ];
         }
 
@@ -110,13 +113,15 @@ class RiskIntelligenceService
             ->values()
             ->all();
         $signalCount        = $allSignals->count();
-        $volatilityMetrics  = $this->computeVolatilityMetrics($this->computeMonthlyScores($domains));
+        $monthlyHistory       = $this->computeMonthlyScores($domains);
+        $volatilityMetrics    = $this->computeVolatilityMetrics($monthlyHistory);
         $fragilityMetrics     = $this->computeFragilityMetrics(
             $nationalRiskScore,
             $volatilityMetrics['volatility_index'],
             $volatilityMetrics['acceleration']
         );
         $concentrationMetrics = $this->computeConcentrationMetrics($countryId);
+        $projectedRisk        = $this->calculateProjection($monthlyHistory, $volatilityMetrics['acceleration']);
 
         return [
             'national_risk_score'      => $nationalRiskScore,
@@ -139,6 +144,9 @@ class RiskIntelligenceService
             'risk_concentration_index' => $concentrationMetrics['risk_concentration_index'],
             'concentration_label'      => $concentrationMetrics['concentration_label'],
             'top_20_percent_share'     => $concentrationMetrics['top_20_percent_share'],
+            'projected_risk_3m'        => $projectedRisk,
+            'projection_confidence'    => $this->deriveProjectionConfidence($volatilityMetrics['volatility_index']),
+            'projection_trend'         => $this->deriveProjectionTrend($nationalRiskScore, $projectedRisk),
         ];
     }
 
@@ -240,6 +248,58 @@ class RiskIntelligenceService
             $gini <= 0.4 => 'moderately_concentrated',
             $gini <= 0.6 => 'concentrated',
             default      => 'highly_concentrated',
+        };
+    }
+
+    protected function calculateProjection(array $monthlyHistory, float $acceleration): float
+    {
+        $scores = array_column($monthlyHistory, 'weighted_score');
+        $last6  = array_slice($scores, -6);
+        $n      = count($last6);
+
+        if ($n < 2) {
+            return 0.0;
+        }
+
+        $xMean = ($n - 1) / 2.0;
+        $yMean = array_sum($last6) / $n;
+
+        $numerator   = 0.0;
+        $denominator = 0.0;
+
+        foreach ($last6 as $i => $y) {
+            $numerator   += ($i - $xMean) * ($y - $yMean);
+            $denominator += ($i - $xMean) ** 2;
+        }
+
+        $slope     = $denominator != 0 ? $numerator / $denominator : 0.0;
+        $lastScore = end($last6);
+        $projected = $lastScore + ($slope * 3);
+
+        if ($acceleration > 0) {
+            $projected += $acceleration * 0.5;
+        }
+
+        return round(min(100.0, max(0.0, $projected)), 2);
+    }
+
+    protected function deriveProjectionConfidence(float $volatility): string
+    {
+        return match (true) {
+            $volatility <= 5  => 'high',
+            $volatility <= 15 => 'moderate',
+            default           => 'low',
+        };
+    }
+
+    protected function deriveProjectionTrend(float $currentScore, float $projectedScore): string
+    {
+        $delta = $projectedScore - $currentScore;
+
+        return match (true) {
+            $delta <= -5 => 'improving',
+            $delta <= 5  => 'stable',
+            default      => 'deteriorating',
         };
     }
 

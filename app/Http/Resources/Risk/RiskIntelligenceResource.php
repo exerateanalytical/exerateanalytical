@@ -26,6 +26,9 @@ class RiskIntelligenceResource extends JsonResource
             'risk_concentration_index' => $this->resource['risk_concentration_index'],
             'concentration_label'      => $this->resource['concentration_label'],
             'top_20_percent_share'     => $this->resource['top_20_percent_share'],
+            'projected_risk_3m'        => $this->resource['projected_risk_3m'],
+            'projection_confidence'    => $this->resource['projection_confidence'],
+            'projection_trend'         => $this->resource['projection_trend'],
         ];
     }
 }

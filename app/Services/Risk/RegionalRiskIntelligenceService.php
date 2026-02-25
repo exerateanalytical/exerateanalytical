@@ -63,18 +63,23 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
                 'risk_delta_from_national'       => 0.0,
                 'fragility_delta_from_national'  => 0.0,
                 'divergence_label'               => 'aligned',
+                'projected_regional_risk_3m' => 0.0,
+                'projection_confidence'      => 'low',
+                'projection_trend'           => 'stable',
             ];
         }
 
         $score             = round($this->weightedScore($domains), 2);
         $level             = $this->deriveRiskLevel($score);
         $trend             = $this->computeTrend($domains);
-        $volatilityMetrics = $this->computeVolatilityMetrics($this->computeMonthlyScores($domains));
+        $monthlyHistory    = $this->computeMonthlyScores($domains);
+        $volatilityMetrics = $this->computeVolatilityMetrics($monthlyHistory);
         $fragilityMetrics  = $this->computeFragilityMetrics(
             $score,
             $volatilityMetrics['volatility_index'],
             $volatilityMetrics['acceleration']
         );
+        $projectedRisk     = $this->calculateProjection($monthlyHistory, $volatilityMetrics['acceleration']);
 
         $national       = $this->getNationalRiskSummary($countryId);
         $riskDelta      = round($score - $national['national_risk_score'], 2);
@@ -98,6 +103,9 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
             'risk_delta_from_national'       => $riskDelta,
             'fragility_delta_from_national'  => $fragilityDelta,
             'divergence_label'               => $this->deriveDivergenceLabel($fragilityDelta),
+            'projected_regional_risk_3m'     => $projectedRisk,
+            'projection_confidence'          => $this->deriveProjectionConfidence($volatilityMetrics['volatility_index']),
+            'projection_trend'               => $this->deriveProjectionTrend($score, $projectedRisk),
         ];
     }
 
