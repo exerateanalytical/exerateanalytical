@@ -273,3 +273,177 @@ it('runSensitivitySimulation returns array with pillar impact data', function ()
         expect($firstResult)->toHaveKeys(['pillar_id', 'pillar_name', 'delta', 'simulated_score', 'impact_variance']);
     }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Batch 4 — Phase 2A: Service Layer Test Hardening
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 1. Composite score happy path ───────────────────────────────────────────────
+
+it('calculateCompositeScore returns the correct weighted composite score and persists the record', function () {
+    $country = Country::factory()->create();
+
+    // Two pillars: 60% and 40% weight (sum = 100 — passes pillar weight guard)
+    $pillarA = Pillar::factory()->create([
+        'country_id' => $country->id,
+        'name'       => 'Rule of Law',
+        'weight'     => 60.00,
+    ]);
+    $pillarB = Pillar::factory()->create([
+        'country_id' => $country->id,
+        'name'       => 'Accountability',
+        'weight'     => 40.00,
+    ]);
+
+    // Each pillar has one indicator at weight 100 (passes indicator weight guard)
+    $indA = Indicator::factory()->create([
+        'pillar_id'  => $pillarA->id,
+        'country_id' => $country->id,
+        'weight'     => 100.00,
+    ]);
+    $indB = Indicator::factory()->create([
+        'pillar_id'  => $pillarB->id,
+        'country_id' => $country->id,
+        'weight'     => 100.00,
+    ]);
+
+    // Pillar A score = 80.0 * (100/100) = 80.0
+    // Pillar B score = 50.0 * (100/100) = 50.0
+    // composite     = (80.0 * 60/100) + (50.0 * 40/100) = 48.0 + 20.0 = 68.0
+    IndicatorValue::factory()->create([
+        'indicator_id'     => $indA->id,
+        'country_id'       => $country->id,
+        'year'             => 2024,
+        'raw_value'        => 80,
+        'normalized_value' => 80.0,
+    ]);
+    IndicatorValue::factory()->create([
+        'indicator_id'     => $indB->id,
+        'country_id'       => $country->id,
+        'year'             => 2024,
+        'raw_value'        => 50,
+        'normalized_value' => 50.0,
+    ]);
+
+    $record = $this->service->calculateCompositeScore($country->id, null, 2024);
+
+    expect($record)->toBeInstanceOf(GovernanceScore::class);
+    expect((float) $record->composite_score)->toBe(68.0);
+    expect($record->country_id)->toBe($country->id);
+    expect($record->region_id)->toBeNull();
+    expect($record->year)->toBe(2024);
+
+    // Confirm the record was persisted to the database
+    $persisted = GovernanceScore::where('country_id', $country->id)
+        ->where('year', 2024)
+        ->whereNull('region_id')
+        ->first();
+
+    expect($persisted)->not->toBeNull();
+    expect((float) $persisted->composite_score)->toBe(68.0);
+});
+
+// 2. Pillar weight mismatch at composite level ─────────────────────────────────
+
+it('calculateCompositeScore throws IndicatorWeightMismatchException when pillar weights do not sum to 100', function () {
+    $country = Country::factory()->create();
+
+    // Pillar weights: 60 + 30 = 90 ≠ 100
+    Pillar::factory()->create(['country_id' => $country->id, 'weight' => 60.00]);
+    Pillar::factory()->create(['country_id' => $country->id, 'weight' => 30.00]);
+
+    expect(fn () => $this->service->calculateCompositeScore($country->id, null, 2024))
+        ->toThrow(IndicatorWeightMismatchException::class);
+});
+
+// 3. Missing normalized value throws at pillar score ───────────────────────────
+
+it('calculatePillarScore throws DataIntegrityException when an indicator has no normalized value', function () {
+    $country   = Country::factory()->create();
+    $pillar    = Pillar::factory()->create(['country_id' => $country->id, 'weight' => 100.00]);
+    $indicator = Indicator::factory()->create([
+        'pillar_id'  => $pillar->id,
+        'country_id' => $country->id,
+        'weight'     => 100.00,
+    ]);
+
+    // Factory defaults normalized_value to null — no normalization has been run
+    IndicatorValue::factory()->create([
+        'indicator_id'     => $indicator->id,
+        'country_id'       => $country->id,
+        'year'             => 2024,
+        'normalized_value' => null,
+    ]);
+
+    expect(fn () => $this->service->calculatePillarScore($pillar->id, $country->id, 2024))
+        ->toThrow(DataIntegrityException::class);
+});
+
+// 4. Z-score with fewer than 2 values throws ──────────────────────────────────
+
+it('throws DataIntegrityException when fewer than 2 values are provided for zscore normalization', function () {
+    $country   = Country::factory()->create();
+    $pillar    = Pillar::factory()->create(['country_id' => $country->id]);
+    $indicator = Indicator::factory()->create([
+        'pillar_id'            => $pillar->id,
+        'country_id'           => $country->id,
+        'normalization_method' => 'zscore',
+    ]);
+
+    // Single value — insufficient for z-score (requires at least 2)
+    IndicatorValue::factory()->create([
+        'indicator_id' => $indicator->id,
+        'country_id'   => $country->id,
+        'year'         => 2024,
+    ]);
+
+    expect(fn () => $this->service->normalizeIndicator($indicator->id, $country->id, 2024))
+        ->toThrow(DataIntegrityException::class, 'at least 2 values required');
+});
+
+// 5. getCompositeScore returns null when no record exists ──────────────────────
+
+it('getCompositeScore returns null when no governance score record exists for the country and year', function () {
+    $country = Country::factory()->create();
+
+    $result = $this->service->getCompositeScore($country->id, 2024);
+
+    expect($result)->toBeNull();
+});
+
+// 6. runSensitivitySimulation baseline guard ───────────────────────────────────
+
+it('runSensitivitySimulation throws DataIntegrityException when no baseline composite score exists', function () {
+    $country = Country::factory()->create();
+    Pillar::factory()->create(['country_id' => $country->id]);
+
+    // No GovernanceScore record exists — baseline is null
+    expect(fn () => $this->service->runSensitivitySimulation($country->id, 2024))
+        ->toThrow(DataIntegrityException::class);
+});
+
+// 7. Trend ordering and limit ─────────────────────────────────────────────────
+
+it('getTrend returns national scores ordered by year descending and respects the limit', function () {
+    $country = Country::factory()->create();
+
+    // Create 6 national scores for consecutive years 2019–2024
+    foreach (range(2019, 2024) as $year) {
+        GovernanceScore::factory()->create([
+            'country_id' => $country->id,
+            'region_id'  => null,
+            'year'       => $year,
+        ]);
+    }
+
+    $trend = $this->service->getTrend($country->id, 5);
+
+    expect($trend)->toHaveCount(5);
+
+    // Most recent year must be first
+    expect($trend->first()->year)->toBe(2024);
+    expect($trend->last()->year)->toBe(2020);
+
+    // Full descending year sequence
+    expect($trend->pluck('year')->toArray())->toBe([2024, 2023, 2022, 2021, 2020]);
+});
