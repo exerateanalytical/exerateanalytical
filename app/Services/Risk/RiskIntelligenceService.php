@@ -93,6 +93,8 @@ class RiskIntelligenceService
                 'volatility_index'    => 0.0,
                 'acceleration'        => 0.0,
                 'stability_label'     => 'stable',
+                'fragility_index'     => 0.0,
+                'fragility_label'     => 'resilient',
             ];
         }
 
@@ -105,6 +107,11 @@ class RiskIntelligenceService
             ->all();
         $signalCount        = $allSignals->count();
         $volatilityMetrics  = $this->computeVolatilityMetrics($this->computeMonthlyScores($domains));
+        $fragilityMetrics   = $this->computeFragilityMetrics(
+            $nationalRiskScore,
+            $volatilityMetrics['volatility_index'],
+            $volatilityMetrics['acceleration']
+        );
 
         return [
             'national_risk_score' => $nationalRiskScore,
@@ -122,6 +129,8 @@ class RiskIntelligenceService
             'volatility_index'    => $volatilityMetrics['volatility_index'],
             'acceleration'        => $volatilityMetrics['acceleration'],
             'stability_label'     => $volatilityMetrics['stability_label'],
+            'fragility_index'     => $fragilityMetrics['fragility_index'],
+            'fragility_label'     => $fragilityMetrics['fragility_label'],
         ];
     }
 
@@ -274,6 +283,34 @@ class RiskIntelligenceService
             $volatility <= 5  => 'stable',
             $volatility <= 15 => 'fluctuating',
             default           => 'highly_unstable',
+        };
+    }
+
+    protected function computeFragilityMetrics(float $riskScore, float $volatility, float $acceleration): array
+    {
+        $fragility = $this->calculateFragility($riskScore, $volatility, $acceleration);
+
+        return [
+            'fragility_index' => $fragility,
+            'fragility_label' => $this->deriveFragilityLabel($fragility),
+        ];
+    }
+
+    private function calculateFragility(float $riskScore, float $volatility, float $acceleration): float
+    {
+        return round(
+            ($riskScore * 0.5) + ($volatility * 0.3) + (max($acceleration, 0) * 0.2),
+            2
+        );
+    }
+
+    private function deriveFragilityLabel(float $fragility): string
+    {
+        return match (true) {
+            $fragility <= 30 => 'resilient',
+            $fragility <= 60 => 'vulnerable',
+            $fragility <= 80 => 'fragile',
+            default          => 'critical',
         };
     }
 

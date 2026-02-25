@@ -58,6 +58,8 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
                 'volatility_index'    => 0.0,
                 'acceleration'        => 0.0,
                 'stability_label'     => 'stable',
+                'fragility_index'     => 0.0,
+                'fragility_label'     => 'resilient',
             ];
         }
 
@@ -65,6 +67,11 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
         $level             = $this->deriveRiskLevel($score);
         $trend             = $this->computeTrend($domains);
         $volatilityMetrics = $this->computeVolatilityMetrics($this->computeMonthlyScores($domains));
+        $fragilityMetrics  = $this->computeFragilityMetrics(
+            $score,
+            $volatilityMetrics['volatility_index'],
+            $volatilityMetrics['acceleration']
+        );
 
         return [
             'regional_risk_score' => $score,
@@ -79,6 +86,8 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
             'volatility_index'    => $volatilityMetrics['volatility_index'],
             'acceleration'        => $volatilityMetrics['acceleration'],
             'stability_label'     => $volatilityMetrics['stability_label'],
+            'fragility_index'     => $fragilityMetrics['fragility_index'],
+            'fragility_label'     => $fragilityMetrics['fragility_label'],
         ];
     }
 
