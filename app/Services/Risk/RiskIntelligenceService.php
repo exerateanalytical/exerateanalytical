@@ -328,6 +328,39 @@ class RiskIntelligenceService
         ];
     }
 
+    public function computeSystemicImportance(array $exposureMatrix): array
+    {
+        $results = [];
+
+        foreach ($exposureMatrix as $countryId => $outgoingEdges) {
+            $summary = $this->getNationalRiskSummary((string) $countryId);
+
+            $outgoingExposureWeight = array_sum(array_values($outgoingEdges));
+
+            $stressAmplificationScore = round(
+                ($summary['fragility_index']     * 0.4)
+                + ($summary['volatility_index']  * 0.3)
+                + ($summary['national_risk_score'] * 0.3),
+                2
+            );
+
+            $systemicImportanceScore = $outgoingExposureWeight > 0
+                ? round($stressAmplificationScore * log(1 + $outgoingExposureWeight), 4)
+                : 0.0;
+
+            $results[] = [
+                'country_id'                  => $countryId,
+                'outgoing_exposure_weight'    => $outgoingExposureWeight,
+                'stress_amplification_score'  => $stressAmplificationScore,
+                'systemic_importance_score'   => $systemicImportanceScore,
+            ];
+        }
+
+        usort($results, fn ($a, $b) => $b['systemic_importance_score'] <=> $a['systemic_importance_score']);
+
+        return $results;
+    }
+
     private function computeNationalShock(string $countryId, float $shockPercent): array
     {
         $national         = $this->getNationalRiskSummary($countryId);
