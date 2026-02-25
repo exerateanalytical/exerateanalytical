@@ -350,6 +350,9 @@ class RiskIntelligenceService
 
             $results[] = [
                 'country_id'                  => $countryId,
+                'baseline_risk'               => $summary['national_risk_score'],
+                'fragility_index'             => $summary['fragility_index'],
+                'volatility_index'            => $summary['volatility_index'],
                 'outgoing_exposure_weight'    => $outgoingExposureWeight,
                 'stress_amplification_score'  => $stressAmplificationScore,
                 'systemic_importance_score'   => $systemicImportanceScore,
