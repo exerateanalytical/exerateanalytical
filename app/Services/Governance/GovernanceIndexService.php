@@ -4,7 +4,6 @@ namespace App\Services\Governance;
 
 use App\Exceptions\DataIntegrityException;
 use App\Exceptions\IndicatorWeightMismatchException;
-use App\Jobs\GovernanceRiskEvaluationJob;
 use App\Models\GovernanceScore;
 use App\Models\Indicator;
 use App\Models\IndicatorValue;
@@ -74,8 +73,7 @@ class GovernanceIndexService
     {
         $count = $rawValues->count();
         if ($count < 2) {
-            Log::warning('Insufficient data for z-score normalization');
-            return;
+            throw new DataIntegrityException('Insufficient data for z-score normalization: at least 2 values required.');
         }
 
         $mean = $rawValues->avg();
@@ -127,11 +125,9 @@ class GovernanceIndexService
                 ->first();
 
             if (!$value) {
-                Log::warning('Missing normalized value for indicator', [
-                    'indicator_id' => $indicator->id,
-                    'year' => $year,
-                ]);
-                continue;
+                throw new DataIntegrityException(
+                    "Missing normalized value for indicator [{$indicator->id}] in year [{$year}]."
+                );
             }
 
             $weightedScore += ((float) $value->normalized_value * (float) $indicator->weight) / 100;
@@ -194,10 +190,6 @@ class GovernanceIndexService
 
         Cache::forget("governance:{$countryId}:{$year}");
 
-        if (!$regionId) {
-            GovernanceRiskEvaluationJob::dispatch($countryId, $year);
-        }
-
         return $scoreRecord;
     }
 
@@ -208,6 +200,13 @@ class GovernanceIndexService
     {
         $pillars = Pillar::where('country_id', $countryId)->active()->get();
         $baseline = $this->getCompositeScore($countryId, $year);
+
+        if ($baseline === null) {
+            throw new DataIntegrityException(
+                "No baseline composite score found for country [{$countryId}] in year [{$year}]. Run calculateCompositeScore() first."
+            );
+        }
+
         $results = [];
 
         foreach ($pillars as $pillar) {
@@ -248,13 +247,15 @@ class GovernanceIndexService
         return $results;
     }
 
-    public function getCompositeScore(string $countryId, int $year): float
+    public function getCompositeScore(string $countryId, int $year): ?float
     {
-        return (float) (GovernanceScore::where('country_id', $countryId)
+        $score = GovernanceScore::where('country_id', $countryId)
             ->where('year', $year)
             ->whereNull('region_id')
             ->latest('calculated_at')
-            ->value('composite_score') ?? 0.0);
+            ->value('composite_score');
+
+        return $score !== null ? (float) $score : null;
     }
 
     public function getTrend(string $countryId, int $years = 5): Collection
