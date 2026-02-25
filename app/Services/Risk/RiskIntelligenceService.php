@@ -42,17 +42,12 @@ class RiskIntelligenceService
             ];
         }
 
-        $nationalRiskScore = round(
-            ($this->domainAvg($domains['governance'])    * self::DOMAIN_WEIGHTS['governance'])
-            + ($this->domainAvg($domains['fiscal'])        * self::DOMAIN_WEIGHTS['fiscal'])
-            + ($this->domainAvg($domains['accountability']) * self::DOMAIN_WEIGHTS['accountability']),
-            2
-        );
+        $nationalRiskScore = round($this->weightedScore($domains), 2);
 
         return [
             'national_risk_score' => $nationalRiskScore,
             'risk_level'          => $this->deriveRiskLevel($nationalRiskScore),
-            'trend'               => $this->computeTrend($allSignals),
+            'trend'               => $this->computeTrend($domains),
             'active_categories'   => collect(['accountability', 'fiscal', 'governance'])
                 ->filter(fn ($domain) => $domains[$domain]->isNotEmpty())
                 ->values()
@@ -69,7 +64,7 @@ class RiskIntelligenceService
     private function collectDomains(string $countryId, Carbon $windowStart): array
     {
         $governance = RiskSignal::where('country_id', $countryId)
-            ->where('module', 'Governance')
+            ->where(fn ($q) => $q->where('module', 'Governance')->orWhereNull('module'))
             ->where('triggered_at', '>=', $windowStart)
             ->get()
             ->map(fn ($s) => ['severity' => $s->severity, 'triggered_at' => $s->triggered_at]);
@@ -89,6 +84,28 @@ class RiskIntelligenceService
             'governance'     => $governance,
             'fiscal'         => $fiscal,
             'accountability' => $accountability,
+        ];
+    }
+
+    private function weightedScore(array $domains): float
+    {
+        return ($this->domainAvg($domains['governance'])     * self::DOMAIN_WEIGHTS['governance'])
+            + ($this->domainAvg($domains['fiscal'])          * self::DOMAIN_WEIGHTS['fiscal'])
+            + ($this->domainAvg($domains['accountability'])  * self::DOMAIN_WEIGHTS['accountability']);
+    }
+
+    private function filterDomains(array $domains, Carbon $from, ?Carbon $before = null): array
+    {
+        $slice = fn (Collection $signals) => $signals->filter(
+            fn ($s) => $s['triggered_at']
+                && $s['triggered_at']->gte($from)
+                && ($before === null || $s['triggered_at']->lt($before))
+        );
+
+        return [
+            'governance'     => $slice($domains['governance']),
+            'fiscal'         => $slice($domains['fiscal']),
+            'accountability' => $slice($domains['accountability']),
         ];
     }
 
@@ -116,37 +133,31 @@ class RiskIntelligenceService
         };
     }
 
-    private function computeTrend(Collection $allSignals): string
+    private function computeTrend(array $domains): string
     {
         $now           = Carbon::now();
         $recentCutoff  = $now->copy()->subDays(30);
         $baselineStart = $now->copy()->subDays(90);
 
-        $recent = $allSignals->filter(
-            fn ($s) => $s['triggered_at'] && $s['triggered_at']->gte($recentCutoff)
-        );
+        $recentDomains   = $this->filterDomains($domains, $recentCutoff);
+        $baselineDomains = $this->filterDomains($domains, $baselineStart, $recentCutoff);
 
-        $baseline = $allSignals->filter(
-            fn ($s) => $s['triggered_at']
-                && $s['triggered_at']->lt($recentCutoff)
-                && $s['triggered_at']->gte($baselineStart)
-        );
+        $baselineEmpty = $baselineDomains['governance']->isEmpty()
+            && $baselineDomains['fiscal']->isEmpty()
+            && $baselineDomains['accountability']->isEmpty();
 
-        if ($baseline->isEmpty()) {
+        if ($baselineEmpty) {
             return 'stable';
         }
 
-        $recentAvg = $recent->isEmpty()
-            ? 0.0
-            : $recent->avg(fn ($s) => $this->normalizeSeverity($s['severity']));
+        $recentWeightedScore   = $this->weightedScore($recentDomains);
+        $baselineWeightedScore = $this->weightedScore($baselineDomains);
 
-        $baselineAvg = $baseline->avg(fn ($s) => $this->normalizeSeverity($s['severity']));
-
-        if ($recentAvg > $baselineAvg + 5) {
+        if ($recentWeightedScore > $baselineWeightedScore + 5) {
             return 'deteriorating';
         }
 
-        if ($recentAvg < $baselineAvg - 5) {
+        if ($recentWeightedScore < $baselineWeightedScore - 5) {
             return 'improving';
         }
 
