@@ -2,6 +2,7 @@
 
 use App\Models\Country;
 use App\Models\ServiceAccessRecord;
+use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 
 beforeEach(function () {
@@ -68,5 +69,63 @@ describe('GET /api/v1/development/{country}/trend', function () {
 
         $response->assertOk()
             ->assertJsonPath('data', []);
+    });
+});
+
+describe('GET /api/v1/development/{country}/{region}/{year}', function () {
+    it('returns 200 with regional service access data when a record exists', function () {
+        $region = \App\Models\Region::factory()->create(['country_id' => $this->country->id]);
+
+        ServiceAccessRecord::create([
+            'country_id'  => $this->country->id,
+            'region_id'   => $region->id,
+            'year'        => 2023,
+            'electricity_access_percent' => 55.00,
+            'source_title' => 'Test',
+            'source_url'   => 'https://example.com',
+            'created_by'   => User::factory()->create()->id,
+        ]);
+
+        $response = $this->getJson("/api/v1/development/{$this->country->id}/{$region->id}/2023");
+
+        $response->assertOk()
+            ->assertJsonStructure(['data' => ['id', 'country_id', 'region_id', 'year']])
+            ->assertJsonPath('data.region_id', $region->id);
+    });
+
+    it('returns 404 when no regional service access record exists', function () {
+        $region = \App\Models\Region::factory()->create(['country_id' => $this->country->id]);
+
+        $response = $this->getJson("/api/v1/development/{$this->country->id}/{$region->id}/1999");
+
+        $response->assertNotFound()
+            ->assertJsonPath('message', 'No regional service access record found.');
+    });
+});
+
+describe('GET /api/v1/development/{country}/{year} — equity shape', function () {
+    it('includes the equity key in the show response when an equity metric exists', function () {
+        ServiceAccessRecord::create([
+            'country_id'  => $this->country->id,
+            'region_id'   => null,
+            'year'        => 2023,
+            'electricity_access_percent' => 72.50,
+            'source_title' => 'Test',
+            'source_url'   => 'https://example.com',
+            'created_by'   => User::factory()->create()->id,
+        ]);
+
+        \App\Models\RegionalEquityMetric::create([
+            'country_id'    => $this->country->id,
+            'year'          => 2023,
+            'equity_score'  => 85.00,
+            'calculated_at' => now(),
+        ]);
+
+        $response = $this->getJson("/api/v1/development/{$this->country->id}/2023");
+
+        $response->assertOk()
+            ->assertJsonStructure(['data', 'equity'])
+            ->assertJsonPath('equity.country_id', $this->country->id);
     });
 });
