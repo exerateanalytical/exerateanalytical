@@ -16,6 +16,7 @@ class RegionalEquityCalculationJob implements ShouldQueue
 
     public int $tries = 3;
     public int $backoff = 60;
+    public int $timeout = 120;
 
     public function __construct(
         public readonly string $countryId,
@@ -39,7 +40,7 @@ class RegionalEquityCalculationJob implements ShouldQueue
 
     public function failed(\Throwable $exception): void
     {
-        Log::error('RegionalEquityCalculationJob failed', [
+        Log::critical('RegionalEquityCalculationJob failed', [
             'country_id' => $this->countryId,
             'year' => $this->year,
             'error' => $exception->getMessage(),
