@@ -50,6 +50,14 @@ class AccountabilityController extends Controller
 
     public function recalculate(string $countryId, string $entityId): JsonResponse
     {
+        $entity = AccountabilityEntity::where('id', $entityId)
+            ->where('country_id', $countryId)
+            ->first();
+
+        if (!$entity) {
+            return response()->json(['message' => 'Accountability entity not found.'], 404);
+        }
+
         $score = $this->service->calculateCompositeAccountability($entityId);
 
         return response()->json([

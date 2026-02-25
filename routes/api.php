@@ -53,8 +53,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/development/{country}/trend', [DevelopmentController::class, 'trend'])->name('development.trend');
 
         // Accountability
-        Route::get('/accountability/{country}/{year}', [AccountabilityController::class, 'index'])->name('accountability.index');
-        Route::get('/accountability/{country}/{region}/{year}', [AccountabilityController::class, 'showRegional'])->name('accountability.regional');
+        Route::get('/accountability/{country}/{year}', [AccountabilityController::class, 'index'])->whereNumber('year')->name('accountability.index');
+        Route::get('/accountability/{country}/{region}/{year}', [AccountabilityController::class, 'showRegional'])->whereNumber('year')->name('accountability.regional');
         Route::get('/accountability/{country}/institution/{institution}', [AccountabilityController::class, 'showInstitution'])->name('accountability.institution');
 
         // Civic
@@ -102,7 +102,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/governance/{country}/{year}/sensitivity', [GovernanceController::class, 'sensitivity'])->name('governance.sensitivity');
 
         // Accountability management
-        Route::post('/accountability/{country}/{entity}/recalculate', [AccountabilityController::class, 'recalculate'])->name('accountability.recalculate');
+        Route::post('/accountability/{country}/{entity}/recalculate', [AccountabilityController::class, 'recalculate'])->whereUuid('entity')->name('accountability.recalculate');
 
         // Civic petitions (public submission allowed without auth, but admin review requires auth)
         Route::post('/civic/petitions', [\App\Http\Controllers\Api\V1\CivicController::class, 'storePetition'])->name('civic.petitions.store');

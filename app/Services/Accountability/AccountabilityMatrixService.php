@@ -8,6 +8,7 @@ use App\Models\AccountabilityScore;
 use App\Models\BudgetAllocation;
 use App\Models\RiskSignal;
 use App\Models\ServiceAccessRecord;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AccountabilityMatrixService
@@ -106,42 +107,49 @@ class AccountabilityMatrixService
 
         $previousScore = AccountabilityScore::where('accountability_entity_id', $entityId)->latest()->first();
 
-        $score = AccountabilityScore::updateOrCreate(
-            ['accountability_entity_id' => $entityId],
-            [
-                'budget_execution_score' => $budgetScore,
-                'delivery_score' => $deliveryScore,
-                'service_impact_score' => $serviceScore,
-                'transparency_score' => $transparencyScore,
-                'composite_accountability_score' => round($composite, 2),
-                'calculated_at' => now(),
-            ]
-        );
+        $score = DB::transaction(function () use (
+            $entityId, $entity, $budgetScore, $deliveryScore,
+            $serviceScore, $transparencyScore, $composite, $previousScore
+        ) {
+            $score = AccountabilityScore::updateOrCreate(
+                ['accountability_entity_id' => $entityId],
+                [
+                    'budget_execution_score' => $budgetScore,
+                    'delivery_score' => $deliveryScore,
+                    'service_impact_score' => $serviceScore,
+                    'transparency_score' => $transparencyScore,
+                    'composite_accountability_score' => round($composite, 2),
+                    'calculated_at' => now(),
+                ]
+            );
 
-        if ($previousScore) {
-            AccountabilityAuditLog::create([
-                'entity_id' => $entityId,
-                'previous_score' => $previousScore->toArray(),
-                'new_score' => $score->toArray(),
-                'changed_by' => auth()->id(),
-                'changed_at' => now(),
-            ]);
+            if ($previousScore) {
+                AccountabilityAuditLog::create([
+                    'entity_id' => $entityId,
+                    'previous_score' => $previousScore->toArray(),
+                    'new_score' => $score->toArray(),
+                    'changed_by' => auth()->id(),
+                    'changed_at' => now(),
+                ]);
 
-            $prevComposite = (float) $previousScore->composite_accountability_score;
-            if ($prevComposite > 0) {
-                $dropPercent = (($prevComposite - $composite) / $prevComposite) * 100;
-                if ($dropPercent > 15) {
-                    RiskSignal::create([
-                        'country_id' => $entity->country_id,
-                        'signal_type' => 'accountability_score_drop',
-                        'severity' => 'high',
-                        'module' => 'Accountability',
-                        'description' => "Composite accountability score dropped by " . round($dropPercent, 2) . "% YoY.",
-                        'triggered_at' => now(),
-                    ]);
+                $prevComposite = (float) $previousScore->composite_accountability_score;
+                if ($prevComposite > 0) {
+                    $dropPercent = (($prevComposite - $composite) / $prevComposite) * 100;
+                    if ($dropPercent > 15) {
+                        RiskSignal::create([
+                            'country_id' => $entity->country_id,
+                            'signal_type' => 'accountability_score_drop',
+                            'severity' => 'high',
+                            'module' => 'Accountability',
+                            'description' => "Composite accountability score dropped by " . round($dropPercent, 2) . "% YoY.",
+                            'triggered_at' => now(),
+                        ]);
+                    }
                 }
             }
-        }
+
+            return $score;
+        });
 
         return $score;
     }
