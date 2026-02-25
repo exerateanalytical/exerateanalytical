@@ -68,6 +68,9 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
                 'projection_trend'                 => 'stable',
                 'projected_regional_risk_lower_3m' => 0.0,
                 'projected_regional_risk_upper_3m' => 0.0,
+                'regime_shift_detected'            => false,
+                'regime_shift_type'                => null,
+                'regime_shift_severity'            => 0.0,
             ];
         }
 
@@ -83,6 +86,7 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
         );
         $projectedRisk     = $this->calculateProjection($monthlyHistory, $volatilityMetrics['acceleration']);
         $band              = $this->computeProjectionBand($projectedRisk, $volatilityMetrics['volatility_index']);
+        $shift             = $this->computeRegimeShift($monthlyHistory, $volatilityMetrics['volatility_index']);
 
         $national       = $this->getNationalRiskSummary($countryId);
         $riskDelta      = round($score - $national['national_risk_score'], 2);
@@ -111,6 +115,9 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
             'projection_trend'                 => $this->deriveProjectionTrend($score, $projectedRisk),
             'projected_regional_risk_lower_3m' => $band['lower'],
             'projected_regional_risk_upper_3m' => $band['upper'],
+            'regime_shift_detected'            => $shift['regime_shift_detected'],
+            'regime_shift_type'                => $shift['regime_shift_type'],
+            'regime_shift_severity'            => $shift['regime_shift_severity'],
         ];
     }
 

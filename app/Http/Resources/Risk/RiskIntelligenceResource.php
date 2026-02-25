@@ -31,6 +31,9 @@ class RiskIntelligenceResource extends JsonResource
             'projection_trend'         => $this->resource['projection_trend'],
             'projected_risk_lower_3m'  => $this->resource['projected_risk_lower_3m'],
             'projected_risk_upper_3m'  => $this->resource['projected_risk_upper_3m'],
+            'regime_shift_detected'    => $this->resource['regime_shift_detected'],
+            'regime_shift_type'        => $this->resource['regime_shift_type'],
+            'regime_shift_severity'    => $this->resource['regime_shift_severity'],
         ];
     }
 }

@@ -104,6 +104,9 @@ class RiskIntelligenceService
                 'projection_trend'         => 'stable',
                 'projected_risk_lower_3m'  => 0.0,
                 'projected_risk_upper_3m'  => 0.0,
+                'regime_shift_detected'    => false,
+                'regime_shift_type'        => null,
+                'regime_shift_severity'    => 0.0,
             ];
         }
 
@@ -125,6 +128,7 @@ class RiskIntelligenceService
         $concentrationMetrics = $this->computeConcentrationMetrics($countryId);
         $projectedRisk        = $this->calculateProjection($monthlyHistory, $volatilityMetrics['acceleration']);
         $band                 = $this->computeProjectionBand($projectedRisk, $volatilityMetrics['volatility_index']);
+        $shift                = $this->computeRegimeShift($monthlyHistory, $volatilityMetrics['volatility_index']);
 
         return [
             'national_risk_score'      => $nationalRiskScore,
@@ -152,6 +156,9 @@ class RiskIntelligenceService
             'projection_trend'         => $this->deriveProjectionTrend($nationalRiskScore, $projectedRisk),
             'projected_risk_lower_3m'  => $band['lower'],
             'projected_risk_upper_3m'  => $band['upper'],
+            'regime_shift_detected'    => $shift['regime_shift_detected'],
+            'regime_shift_type'        => $shift['regime_shift_type'],
+            'regime_shift_severity'    => $shift['regime_shift_severity'],
         ];
     }
 
@@ -316,6 +323,39 @@ class RiskIntelligenceService
             'lower' => round(min(100.0, max(0.0, $projected - $bandWidth)), 2),
             'upper' => round(min(100.0, max(0.0, $projected + $bandWidth)), 2),
         ];
+    }
+
+    protected function computeRegimeShift(array $monthlyHistory, float $volatility): array
+    {
+        $delta = $this->calculateRegimeDelta($monthlyHistory);
+
+        if (abs($delta) >= 12 && $volatility >= 8) {
+            return [
+                'regime_shift_detected'  => true,
+                'regime_shift_type'      => $delta > 0 ? 'escalation' : 'stabilization',
+                'regime_shift_severity'  => round(abs($delta), 2),
+            ];
+        }
+
+        return [
+            'regime_shift_detected'  => false,
+            'regime_shift_type'      => null,
+            'regime_shift_severity'  => 0.0,
+        ];
+    }
+
+    private function calculateRegimeDelta(array $monthlyHistory): float
+    {
+        $scores = array_column($monthlyHistory, 'weighted_score');
+
+        if (count($scores) < 6) {
+            return 0.0;
+        }
+
+        $recent   = array_slice($scores, -3);
+        $previous = array_slice($scores, -6, 3);
+
+        return array_sum($recent) / 3 - array_sum($previous) / 3;
     }
 
     private function collectDomains(string $countryId, Carbon $windowStart): array

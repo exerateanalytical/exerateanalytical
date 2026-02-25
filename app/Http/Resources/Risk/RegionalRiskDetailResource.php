@@ -28,6 +28,9 @@ class RegionalRiskDetailResource extends JsonResource
             'projection_trend'                 => $this->resource['projection_trend'],
             'projected_regional_risk_lower_3m' => $this->resource['projected_regional_risk_lower_3m'],
             'projected_regional_risk_upper_3m' => $this->resource['projected_regional_risk_upper_3m'],
+            'regime_shift_detected'            => $this->resource['regime_shift_detected'],
+            'regime_shift_type'                => $this->resource['regime_shift_type'],
+            'regime_shift_severity'            => $this->resource['regime_shift_severity'],
         ];
     }
 }
