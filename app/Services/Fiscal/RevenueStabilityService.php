@@ -33,21 +33,27 @@ class RevenueStabilityService
             $change = (($curr - $prev) / $prev) * 100;
 
             if ($change < -self::VOLATILITY_THRESHOLD) {
-                $signal = FiscalRiskSignal::create([
-                    'country_id' => $countryId,
-                    'year' => $sorted[$i]->year,
-                    'risk_type' => 'revenue_instability',
-                    'severity' => abs($change) > 30 ? 'high' : 'moderate',
-                    'description' => "Revenue declined by " . round(abs($change), 2) . "% from {$sorted[$i - 1]->year} to {$sorted[$i]->year}.",
-                    'triggered_at' => now(),
-                ]);
+                $signal = FiscalRiskSignal::firstOrCreate(
+                    [
+                        'country_id' => $countryId,
+                        'year'       => $sorted[$i]->year,
+                        'risk_type'  => 'revenue_instability',
+                    ],
+                    [
+                        'severity'    => abs($change) > 30 ? 'high' : 'moderate',
+                        'description' => "Revenue declined by " . round(abs($change), 2) . "% from {$sorted[$i - 1]->year} to {$sorted[$i]->year}.",
+                        'triggered_at' => now(),
+                    ]
+                );
                 $signals[] = $signal;
 
-                Log::warning('Revenue volatility detected', [
-                    'country_id' => $countryId,
-                    'year' => $sorted[$i]->year,
-                    'change_percent' => $change,
-                ]);
+                if ($signal->wasRecentlyCreated) {
+                    Log::warning('Revenue volatility detected', [
+                        'country_id'     => $countryId,
+                        'year'           => $sorted[$i]->year,
+                        'change_percent' => $change,
+                    ]);
+                }
             }
         }
 

@@ -14,7 +14,7 @@ class NationalDebtRecord extends Model
     protected $fillable = [
         'country_id', 'year', 'total_debt', 'debt_to_gdp_ratio', 'external_debt',
         'domestic_debt', 'debt_service_total', 'debt_service_ratio',
-        'interest_payments', 'interest_as_budget_percent', 'risk_classification',
+        'interest_payments', 'interest_as_budget_percent',
         'source_title', 'source_url', 'data_version', 'created_by',
     ];
 

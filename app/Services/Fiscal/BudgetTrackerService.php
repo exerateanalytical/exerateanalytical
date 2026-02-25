@@ -4,6 +4,7 @@ namespace App\Services\Fiscal;
 
 use App\Exceptions\DataIntegrityException;
 use App\Models\BudgetAllocation;
+use App\Models\FiscalRiskSignal;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -42,9 +43,24 @@ class BudgetTrackerService
 
         Log::info('Delay detection complete', [
             'country_id' => $countryId,
-            'year' => $year,
-            'flagged' => $flagged,
+            'year'       => $year,
+            'flagged'    => $flagged,
         ]);
+
+        if ($flagged > 0) {
+            FiscalRiskSignal::firstOrCreate(
+                [
+                    'country_id' => $countryId,
+                    'year'       => $year,
+                    'risk_type'  => 'budget_execution',
+                ],
+                [
+                    'severity'    => 'moderate',
+                    'description' => "{$flagged} budget allocation(s) flagged with execution rate below 50%.",
+                    'triggered_at' => now(),
+                ]
+            );
+        }
 
         return $flagged;
     }

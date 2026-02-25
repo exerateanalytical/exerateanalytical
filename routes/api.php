@@ -42,10 +42,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/governance/{country}/trend', [GovernanceController::class, 'trend'])->name('governance.trend');
 
         // Fiscal
-        Route::get('/fiscal/debt/{country}/{year}', [FiscalController::class, 'debt'])->name('fiscal.debt');
-        Route::get('/fiscal/budget/{country}/{year}', [FiscalController::class, 'budget'])->name('fiscal.budget');
-        Route::get('/fiscal/revenue/{country}/{year}', [FiscalController::class, 'revenue'])->name('fiscal.revenue');
-        Route::get('/fiscal/risk/{country}/{year}', [FiscalController::class, 'risk'])->name('fiscal.risk');
+        Route::get('/fiscal/debt/{country}/{year}', [FiscalController::class, 'debt'])->whereNumber('year')->name('fiscal.debt');
+        Route::get('/fiscal/budget/{country}/{year}', [FiscalController::class, 'budget'])->whereNumber('year')->name('fiscal.budget');
+        Route::get('/fiscal/revenue/{country}/{year}', [FiscalController::class, 'revenue'])->whereNumber('year')->name('fiscal.revenue');
+        Route::get('/fiscal/risk/{country}/{year}', [FiscalController::class, 'risk'])->whereNumber('year')->name('fiscal.risk');
 
         // Development
         Route::get('/development/{country}/{year}', [DevelopmentController::class, 'show'])->name('development.show');

@@ -14,15 +14,14 @@ beforeEach(function () {
 
 describe('GET /api/v1/fiscal/debt/{country}/{year}', function () {
     it('returns 200 with debt record data when a record exists', function () {
-        NationalDebtRecord::create([
-            'country_id' => $this->country->id,
-            'year' => 2023,
-            'total_debt' => 55000000000,
+        NationalDebtRecord::factory()->create([
+            'country_id'        => $this->country->id,
+            'year'              => 2023,
+            'total_debt'        => 55000000000,
             'debt_to_gdp_ratio' => 55.50,
-            'external_debt' => 30000000000,
-            'domestic_debt' => 25000000000,
+            'external_debt'     => 30000000000,
+            'domestic_debt'     => 25000000000,
             'debt_service_ratio' => 18.00,
-            'risk_classification' => 'low',
         ]);
 
         $response = $this->getJson("/api/v1/fiscal/debt/{$this->country->id}/2023");
@@ -45,14 +44,12 @@ describe('GET /api/v1/fiscal/debt/{country}/{year}', function () {
 
 describe('GET /api/v1/fiscal/budget/{country}/{year}', function () {
     it('returns 200 with budget allocations', function () {
-        BudgetAllocation::create([
-            'country_id' => $this->country->id,
-            'year' => 2023,
-            'sector_name' => 'Education',
+        BudgetAllocation::factory()->create([
+            'country_id'       => $this->country->id,
+            'year'             => 2023,
+            'sector_name'      => 'Education',
             'allocated_amount' => 10000000,
-            'executed_amount' => 9000000,
-            'execution_rate' => 90.00,
-            'delay_flag' => false,
+            'executed_amount'  => 9000000,
         ]);
 
         $response = $this->getJson("/api/v1/fiscal/budget/{$this->country->id}/2023");
@@ -71,13 +68,13 @@ describe('GET /api/v1/fiscal/budget/{country}/{year}', function () {
 
 describe('GET /api/v1/fiscal/revenue/{country}/{year}', function () {
     it('returns 200 with revenue record when one exists', function () {
-        RevenueRecord::create([
-            'country_id' => $this->country->id,
-            'year' => 2023,
-            'total_revenue' => 8000000000,
-            'tax_revenue' => 6000000000,
-            'non_tax_revenue' => 1500000000,
-            'grants' => 500000000,
+        RevenueRecord::factory()->create([
+            'country_id'           => $this->country->id,
+            'year'                 => 2023,
+            'total_revenue'        => 8000000000,
+            'tax_revenue'          => 6000000000,
+            'non_tax_revenue'      => 1500000000,
+            'grants'               => 500000000,
             'revenue_to_gdp_ratio' => 18.50,
         ]);
 
@@ -98,12 +95,12 @@ describe('GET /api/v1/fiscal/revenue/{country}/{year}', function () {
 
 describe('GET /api/v1/fiscal/risk/{country}/{year}', function () {
     it('returns 200 with risk signals', function () {
-        FiscalRiskSignal::create([
-            'country_id' => $this->country->id,
-            'year' => 2023,
-            'risk_type' => 'debt_sustainability',
-            'severity' => 'high',
-            'description' => 'Debt ratio elevated at 78%.',
+        FiscalRiskSignal::factory()->create([
+            'country_id'   => $this->country->id,
+            'year'         => 2023,
+            'risk_type'    => 'debt_sustainability',
+            'severity'     => 'high',
+            'description'  => 'Debt ratio elevated at 78%.',
             'triggered_at' => now(),
         ]);
 
