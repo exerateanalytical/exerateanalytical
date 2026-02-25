@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\FiscalController;
 use App\Http\Controllers\Api\V1\GovernanceController;
 use App\Http\Controllers\Api\V1\InstitutionController;
 use App\Http\Controllers\Api\V1\RegionController;
+use App\Http\Controllers\Api\V1\RiskIntelligenceController;
 use App\Http\Controllers\Api\V1\TransparencyController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -62,6 +63,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/civic/approval/{country}/{region}/{year}', [CivicController::class, 'approvalRegional'])->name('civic.approval.regional');
         Route::get('/civic/representation/{country}/{year}', [CivicController::class, 'representation'])->name('civic.representation');
         Route::get('/civic/petitions/{country}', [CivicController::class, 'petitions'])->name('civic.petitions');
+
+        // Risk Intelligence
+        Route::get('/risk-intelligence/{country}', [RiskIntelligenceController::class, 'show'])->name('risk.intelligence');
 
         // Transparency & Methodology
         Route::get('/methodology/{country}', [TransparencyController::class, 'methodology'])->name('transparency.methodology');
