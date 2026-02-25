@@ -144,10 +144,21 @@ class RiskIntelligenceService
 
     protected function computeConcentrationMetrics(string $countryId): array
     {
-        $regional        = new RegionalRiskIntelligenceService();
+        $windowStart     = Carbon::now()->subMonths(12);
         $fragilityValues = Region::where('country_id', $countryId)
             ->get()
-            ->map(fn ($region) => $regional->getRegionalRiskDetail($countryId, $region->id)['fragility_index'])
+            ->map(function ($region) use ($countryId, $windowStart) {
+                $domains           = $this->collectRegionalDomainsForConcentration($countryId, $region->id, $windowStart);
+                $score             = round($this->weightedScore($domains), 2);
+                $volatilityMetrics = $this->computeVolatilityMetrics($this->computeMonthlyScores($domains));
+                $fragilityMetrics  = $this->computeFragilityMetrics(
+                    $score,
+                    $volatilityMetrics['volatility_index'],
+                    $volatilityMetrics['acceleration']
+                );
+
+                return $fragilityMetrics['fragility_index'];
+            })
             ->all();
 
         $gini  = $this->calculateGini($fragilityValues);
@@ -157,6 +168,29 @@ class RiskIntelligenceService
             'risk_concentration_index' => $gini,
             'concentration_label'      => $this->deriveConcentrationLabel($gini),
             'top_20_percent_share'     => $top20,
+        ];
+    }
+
+    private function collectRegionalDomainsForConcentration(string $countryId, string $regionId, Carbon $windowStart): array
+    {
+        $governance = RiskSignal::where('country_id', $countryId)
+            ->where(fn ($q) => $q->where('module', 'Governance')->orWhereNull('module'))
+            ->where('metadata->region_id', $regionId)
+            ->where('triggered_at', '>=', $windowStart)
+            ->get()
+            ->map(fn ($s) => ['severity' => $s->severity, 'triggered_at' => $s->triggered_at]);
+
+        $accountability = RiskSignal::where('country_id', $countryId)
+            ->where('module', 'Accountability')
+            ->where('metadata->region_id', $regionId)
+            ->where('triggered_at', '>=', $windowStart)
+            ->get()
+            ->map(fn ($s) => ['severity' => $s->severity, 'triggered_at' => $s->triggered_at]);
+
+        return [
+            'governance'     => $governance,
+            'fiscal'         => collect(),
+            'accountability' => $accountability,
         ];
     }
 
