@@ -19,7 +19,7 @@ class ServiceAccessRecord extends Model
         'healthcare_facilities_total', 'healthcare_facilities_per_10000',
         'schools_total', 'schools_per_10000',
         'internet_penetration_percent', 'mobile_network_coverage_percent',
-        'source_title', 'source_url', 'data_version', 'created_by',
+        'source_title', 'source_url', 'data_version',
     ];
 
     protected $casts = [

@@ -5,55 +5,75 @@ namespace App\Services\Development;
 use App\Exceptions\DataIntegrityException;
 use App\Models\Region;
 use App\Models\ServiceAccessRecord;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ServiceAccessService
 {
     public function calculateHealthcareDensity(string $regionId, int $year): ?float
     {
-        $record = ServiceAccessRecord::where('region_id', $regionId)
-            ->where('year', $year)
-            ->first();
+        return DB::transaction(function () use ($regionId, $year) {
+            $record = ServiceAccessRecord::where('region_id', $regionId)
+                ->where('year', $year)
+                ->first();
 
-        if (!$record) {
-            Log::warning('No service access record found', ['region_id' => $regionId, 'year' => $year]);
-            return null;
-        }
+            if (!$record) {
+                Log::warning('No service access record found', ['region_id' => $regionId, 'year' => $year]);
+                return null;
+            }
 
-        $region = Region::find($regionId);
-        if (!$region || !$region->population || $region->population == 0) {
-            throw new DataIntegrityException("Population data missing for region [{$regionId}].");
-        }
+            $region = Region::find($regionId);
+            if (!$region || !$region->population || $region->population == 0) {
+                throw new DataIntegrityException("Population data missing for region [{$regionId}].");
+            }
 
-        if ($record->healthcare_facilities_total === null || $record->healthcare_facilities_total < 0) {
-            throw new DataIntegrityException("Invalid healthcare facilities count for region [{$regionId}].");
-        }
+            if ($record->healthcare_facilities_total === null || $record->healthcare_facilities_total < 0) {
+                throw new DataIntegrityException("Invalid healthcare facilities count for region [{$regionId}].");
+            }
 
-        $density = $record->healthcare_facilities_total / ($region->population / 10000);
-        $record->healthcare_facilities_per_10000 = round($density, 2);
-        $record->save();
+            $density = $record->healthcare_facilities_total / ($region->population / 10000);
+            $record->healthcare_facilities_per_10000 = round($density, 2);
+            $record->save();
 
-        return round($density, 2);
+            return round($density, 2);
+        });
     }
 
     public function calculateSchoolDensity(string $regionId, int $year): ?float
     {
-        $record = ServiceAccessRecord::where('region_id', $regionId)
-            ->where('year', $year)
-            ->first();
+        return DB::transaction(function () use ($regionId, $year) {
+            $record = ServiceAccessRecord::where('region_id', $regionId)
+                ->where('year', $year)
+                ->first();
 
-        if (!$record) return null;
+            if (!$record) return null;
 
-        $region = Region::find($regionId);
-        if (!$region || !$region->population || $region->population == 0) {
-            throw new DataIntegrityException("Population data missing for region [{$regionId}].");
-        }
+            $region = Region::find($regionId);
+            if (!$region || !$region->population || $region->population == 0) {
+                throw new DataIntegrityException("Population data missing for region [{$regionId}].");
+            }
 
-        $density = ($record->schools_total ?? 0) / ($region->population / 10000);
-        $record->schools_per_10000 = round($density, 2);
-        $record->save();
+            $density = ($record->schools_total ?? 0) / ($region->population / 10000);
+            $record->schools_per_10000 = round($density, 2);
+            $record->save();
 
-        return round($density, 2);
+            return round($density, 2);
+        });
+    }
+
+    public function store(array $data): ServiceAccessRecord
+    {
+        $this->validatePercentFields($data);
+
+        return DB::transaction(function () use ($data) {
+            $record = new ServiceAccessRecord();
+            $record->fill($data);
+            $record->created_by = Auth::id();
+            $record->save();
+
+            return $record;
+        });
     }
 
     public function validatePercentFields(array $data): bool
