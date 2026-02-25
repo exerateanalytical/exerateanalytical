@@ -164,6 +164,107 @@ class RiskIntelligenceService
         ];
     }
 
+    public function simulateCascadingShock(
+        string $countryId,
+        array $regionShocks,
+        float $contagionFactor
+    ): array {
+        // Step a: clamp contagionFactor to [0, 1]
+        $contagionFactor = min(1.0, max(0.0, $contagionFactor));
+
+        // Step b: baseline national summary (served from cache)
+        $national             = $this->getNationalRiskSummary($countryId);
+        $baselineNationalRisk = $national['national_risk_score'];
+
+        // Secondary shock percent = avg(primary shocks) × contagionFactor
+        $primaryPercents       = array_values($regionShocks);
+        $avgPrimaryShock       = count($primaryPercents) > 0
+            ? array_sum($primaryPercents) / count($primaryPercents)
+            : 0.0;
+        $secondaryShockPercent = $avgPrimaryShock * $contagionFactor;
+
+        $windowStart   = Carbon::now()->subMonths(12);
+        $baselinePool  = [];
+        $postShockPool = [];
+
+        // Step c/d: process every region
+        foreach (Region::where('country_id', $countryId)->get() as $region) {
+            $rDomains       = $this->collectRegionalDomainsForConcentration($countryId, $region->id, $windowStart);
+            $rScore         = round($this->weightedScore($rDomains), 2);
+            $monthlyHistory = $this->computeMonthlyScores($rDomains);
+            $rVolMetrics    = $this->computeVolatilityMetrics($monthlyHistory);
+            $rFragility     = $this->computeFragilityMetrics(
+                $rScore,
+                $rVolMetrics['volatility_index'],
+                $rVolMetrics['acceleration']
+            )['fragility_index'];
+
+            $baselinePool[] = $rFragility;
+
+            // Apply primary or secondary shock to monthly history
+            $shockedHistory = $monthlyHistory;
+            $n              = count($shockedHistory);
+
+            if (array_key_exists($region->id, $regionShocks)) {
+                // Primary shock: last 3 months
+                $shockPercent = $regionShocks[$region->id];
+                for ($i = max(0, $n - 3); $i < $n; $i++) {
+                    $shockedHistory[$i]['weighted_score'] = round(
+                        min(100.0, $shockedHistory[$i]['weighted_score'] * (1 + $shockPercent / 100)),
+                        2
+                    );
+                }
+            } elseif ($n > 0) {
+                // Secondary shock (contagion): last month only
+                $shockedHistory[$n - 1]['weighted_score'] = round(
+                    min(100.0, $shockedHistory[$n - 1]['weighted_score'] * (1 + $secondaryShockPercent / 100)),
+                    2
+                );
+            }
+
+            $shockedScores  = array_column($shockedHistory, 'weighted_score');
+            $postShockScore = count($shockedScores) >= 3
+                ? round(array_sum(array_slice($shockedScores, -3)) / 3, 2)
+                : $rScore;
+            $shockedVol     = $this->computeVolatilityMetrics($shockedHistory);
+            $postFragility  = $this->computeFragilityMetrics(
+                $postShockScore,
+                $shockedVol['volatility_index'],
+                $shockedVol['acceleration']
+            )['fragility_index'];
+
+            $postShockPool[] = $postFragility;
+        }
+
+        // Step e: aggregate metrics
+        $baselineGini       = $this->calculateGini($baselinePool);
+        $postShockGini      = $this->calculateGini($postShockPool);
+        $concentrationDelta = round($postShockGini - $baselineGini, 4);
+
+        $poolCount             = count($baselinePool);
+        $poolMeanShift         = $poolCount > 0
+            ? (array_sum($postShockPool) - array_sum($baselinePool)) / $poolCount
+            : 0.0;
+        $postShockNationalRisk = round(min(100.0, max(0.0, $baselineNationalRisk + $poolMeanShift)), 2);
+        $riskDelta             = round($postShockNationalRisk - $baselineNationalRisk, 2);
+
+        // Systemic instability index: population stddev of post-shock fragility pool
+        $systemicInstabilityIndex = 0.0;
+        if ($poolCount > 0) {
+            $mean     = array_sum($postShockPool) / $poolCount;
+            $variance = array_sum(array_map(fn ($v) => ($v - $mean) ** 2, $postShockPool)) / $poolCount;
+            $systemicInstabilityIndex = round(sqrt($variance), 2);
+        }
+
+        return [
+            'baseline_national_risk'     => $baselineNationalRisk,
+            'post_shock_national_risk'   => $postShockNationalRisk,
+            'risk_delta'                 => $riskDelta,
+            'concentration_delta'        => $concentrationDelta,
+            'systemic_instability_index' => $systemicInstabilityIndex,
+        ];
+    }
+
     private function computeSummary(string $countryId): array
     {
         $windowStart = Carbon::now()->subMonths(12);
