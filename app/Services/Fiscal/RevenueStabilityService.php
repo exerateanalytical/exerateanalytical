@@ -4,11 +4,22 @@ namespace App\Services\Fiscal;
 
 use App\Models\FiscalRiskSignal;
 use App\Models\RevenueRecord;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class RevenueStabilityService
 {
     private const VOLATILITY_THRESHOLD = 20.0;
+
+    public function getRevenueRecord(string $countryId, int $year): ?RevenueRecord
+    {
+        return Cache::remember("fiscal:revenue:{$countryId}:{$year}", 7200, function () use ($countryId, $year) {
+            return RevenueRecord::where('country_id', $countryId)
+                ->where('year', $year)
+                ->latest()
+                ->first();
+        });
+    }
 
     public function detectRevenueVolatility(string $countryId): array
     {

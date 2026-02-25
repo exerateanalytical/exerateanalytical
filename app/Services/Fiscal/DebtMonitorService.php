@@ -11,6 +11,16 @@ use Illuminate\Support\Facades\Log;
 
 class DebtMonitorService
 {
+    public function getDebtRecord(string $countryId, int $year): ?NationalDebtRecord
+    {
+        return Cache::remember("fiscal:debt:{$countryId}:{$year}", 7200, function () use ($countryId, $year) {
+            return NationalDebtRecord::where('country_id', $countryId)
+                ->where('year', $year)
+                ->latest()
+                ->first();
+        });
+    }
+
     public function calculateDebtRisk(string $countryId, int $year): NationalDebtRecord
     {
         $record = NationalDebtRecord::where('country_id', $countryId)

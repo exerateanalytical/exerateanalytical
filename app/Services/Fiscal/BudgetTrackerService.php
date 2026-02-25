@@ -5,11 +5,21 @@ namespace App\Services\Fiscal;
 use App\Exceptions\DataIntegrityException;
 use App\Models\BudgetAllocation;
 use App\Models\FiscalRiskSignal;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class BudgetTrackerService
 {
+    public function getAllocations(string $countryId, int $year): Collection
+    {
+        return Cache::remember("fiscal:budget:{$countryId}:{$year}", 7200, function () use ($countryId, $year) {
+            return BudgetAllocation::where('country_id', $countryId)
+                ->where('year', $year)
+                ->get();
+        });
+    }
+
     public function calculateExecutionRate(string $allocationId): BudgetAllocation
     {
         $allocation = BudgetAllocation::findOrFail($allocationId);
