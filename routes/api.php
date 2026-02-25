@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AccountabilityController;
 use App\Http\Controllers\Api\V1\CivicController;
 use App\Http\Controllers\Api\V1\CountryController;
 use App\Http\Controllers\Api\V1\DevelopmentController;
+use App\Http\Controllers\Api\V1\ExecutiveRiskDashboardController;
 use App\Http\Controllers\Api\V1\FiscalController;
 use App\Http\Controllers\Api\V1\GovernanceController;
 use App\Http\Controllers\Api\V1\InstitutionController;
@@ -66,6 +67,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Risk Intelligence
         Route::get('/risk-intelligence/{country}', [RiskIntelligenceController::class, 'show'])->name('risk.intelligence');
+
+        // Executive Risk Dashboard
+        Route::prefix('dashboard')->name('dashboard.')->group(function () {
+            Route::get('/risk-ranking', [ExecutiveRiskDashboardController::class, 'riskRanking'])->name('risk-ranking');
+            Route::get('/risk-drivers/{country}', [ExecutiveRiskDashboardController::class, 'riskDrivers'])->name('risk-drivers');
+            Route::get('/risk-history/{country}', [ExecutiveRiskDashboardController::class, 'riskHistory'])->name('risk-history');
+            Route::get('/alert-watchlist', [ExecutiveRiskDashboardController::class, 'alertWatchlist'])->name('alert-watchlist');
+        });
 
         // Transparency & Methodology
         Route::get('/methodology/{country}', [TransparencyController::class, 'methodology'])->name('transparency.methodology');
