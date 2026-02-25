@@ -102,6 +102,8 @@ class RiskIntelligenceService
                 'projected_risk_3m'        => 0.0,
                 'projection_confidence'    => 'low',
                 'projection_trend'         => 'stable',
+                'projected_risk_lower_3m'  => 0.0,
+                'projected_risk_upper_3m'  => 0.0,
             ];
         }
 
@@ -122,6 +124,7 @@ class RiskIntelligenceService
         );
         $concentrationMetrics = $this->computeConcentrationMetrics($countryId);
         $projectedRisk        = $this->calculateProjection($monthlyHistory, $volatilityMetrics['acceleration']);
+        $band                 = $this->computeProjectionBand($projectedRisk, $volatilityMetrics['volatility_index']);
 
         return [
             'national_risk_score'      => $nationalRiskScore,
@@ -147,6 +150,8 @@ class RiskIntelligenceService
             'projected_risk_3m'        => $projectedRisk,
             'projection_confidence'    => $this->deriveProjectionConfidence($volatilityMetrics['volatility_index']),
             'projection_trend'         => $this->deriveProjectionTrend($nationalRiskScore, $projectedRisk),
+            'projected_risk_lower_3m'  => $band['lower'],
+            'projected_risk_upper_3m'  => $band['upper'],
         ];
     }
 
@@ -301,6 +306,16 @@ class RiskIntelligenceService
             $delta <= 5  => 'stable',
             default      => 'deteriorating',
         };
+    }
+
+    protected function computeProjectionBand(float $projected, float $volatility): array
+    {
+        $bandWidth = $volatility * 0.5;
+
+        return [
+            'lower' => round(min(100.0, max(0.0, $projected - $bandWidth)), 2),
+            'upper' => round(min(100.0, max(0.0, $projected + $bandWidth)), 2),
+        ];
     }
 
     private function collectDomains(string $countryId, Carbon $windowStart): array

@@ -63,9 +63,11 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
                 'risk_delta_from_national'       => 0.0,
                 'fragility_delta_from_national'  => 0.0,
                 'divergence_label'               => 'aligned',
-                'projected_regional_risk_3m' => 0.0,
-                'projection_confidence'      => 'low',
-                'projection_trend'           => 'stable',
+                'projected_regional_risk_3m'       => 0.0,
+                'projection_confidence'            => 'low',
+                'projection_trend'                 => 'stable',
+                'projected_regional_risk_lower_3m' => 0.0,
+                'projected_regional_risk_upper_3m' => 0.0,
             ];
         }
 
@@ -80,6 +82,7 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
             $volatilityMetrics['acceleration']
         );
         $projectedRisk     = $this->calculateProjection($monthlyHistory, $volatilityMetrics['acceleration']);
+        $band              = $this->computeProjectionBand($projectedRisk, $volatilityMetrics['volatility_index']);
 
         $national       = $this->getNationalRiskSummary($countryId);
         $riskDelta      = round($score - $national['national_risk_score'], 2);
@@ -103,9 +106,11 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
             'risk_delta_from_national'       => $riskDelta,
             'fragility_delta_from_national'  => $fragilityDelta,
             'divergence_label'               => $this->deriveDivergenceLabel($fragilityDelta),
-            'projected_regional_risk_3m'     => $projectedRisk,
-            'projection_confidence'          => $this->deriveProjectionConfidence($volatilityMetrics['volatility_index']),
-            'projection_trend'               => $this->deriveProjectionTrend($score, $projectedRisk),
+            'projected_regional_risk_3m'       => $projectedRisk,
+            'projection_confidence'            => $this->deriveProjectionConfidence($volatilityMetrics['volatility_index']),
+            'projection_trend'                 => $this->deriveProjectionTrend($score, $projectedRisk),
+            'projected_regional_risk_lower_3m' => $band['lower'],
+            'projected_regional_risk_upper_3m' => $band['upper'],
         ];
     }
 

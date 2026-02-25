@@ -29,6 +29,8 @@ class RiskIntelligenceResource extends JsonResource
             'projected_risk_3m'        => $this->resource['projected_risk_3m'],
             'projection_confidence'    => $this->resource['projection_confidence'],
             'projection_trend'         => $this->resource['projection_trend'],
+            'projected_risk_lower_3m'  => $this->resource['projected_risk_lower_3m'],
+            'projected_risk_upper_3m'  => $this->resource['projected_risk_upper_3m'],
         ];
     }
 }
