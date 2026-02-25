@@ -41,22 +41,25 @@ it('calculateBudgetExecutionScore returns the average execution rate of linked b
         'sector_name' => 'Primary Health',
         'allocated_amount' => 1000000,
         'executed_amount' => 800000,
-        'execution_rate' => 80.00,
-        'delay_flag' => false,
         'source_title' => 'Health Budget Report',
         'source_url' => 'https://example.com/health-budget',
     ]);
+    $budget1->execution_rate = 80.00;
+    $budget1->delay_flag = false;
+    $budget1->save();
+
     $budget2 = BudgetAllocation::create([
         'country_id' => $this->country->id,
         'year' => 2023,
         'sector_name' => 'Tertiary Health',
         'allocated_amount' => 2000000,
         'executed_amount' => 1600000,
-        'execution_rate' => 60.00,
-        'delay_flag' => false,
         'source_title' => 'Tertiary Health Report',
         'source_url' => 'https://example.com/tertiary-health',
     ]);
+    $budget2->execution_rate = 60.00;
+    $budget2->delay_flag = false;
+    $budget2->save();
 
     AccountabilityLink::create(['accountability_entity_id' => $entity->id, 'linked_budget_id' => $budget1->id]);
     AccountabilityLink::create(['accountability_entity_id' => $entity->id, 'linked_budget_id' => $budget2->id]);
@@ -87,11 +90,13 @@ it('calculateCompositeAccountability uses weights of 0.3, 0.3, 0.3, 0.1', functi
         'sector_name' => 'Public Finance',
         'allocated_amount' => 1000000,
         'executed_amount' => 900000,
-        'execution_rate' => 90.00,
-        'delay_flag' => false,
         'source_title' => 'Finance Budget Report',
         'source_url' => 'https://example.com/finance-budget',
     ]);
+    $budget->execution_rate = 90.00;
+    $budget->delay_flag = false;
+    $budget->save();
+
     AccountabilityLink::create(['accountability_entity_id' => $entity->id, 'linked_budget_id' => $budget->id]);
 
     $accountabilityScore = $this->service->calculateCompositeAccountability($entity->id);
@@ -136,11 +141,13 @@ it('composite score is clamped to 100 at maximum', function () {
         'sector_name' => 'Energy',
         'allocated_amount' => 5000000,
         'executed_amount' => 5000000,
-        'execution_rate' => 100.00,
-        'delay_flag' => false,
         'source_title' => 'Energy Budget Report',
         'source_url' => 'https://example.com/energy-budget',
     ]);
+    $budget->execution_rate = 100.00;
+    $budget->delay_flag = false;
+    $budget->save();
+
     AccountabilityLink::create(['accountability_entity_id' => $entity->id, 'linked_budget_id' => $budget->id]);
 
     $accountabilityScore = $this->service->calculateCompositeAccountability($entity->id);
