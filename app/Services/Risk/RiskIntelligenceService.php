@@ -23,6 +23,40 @@ class RiskIntelligenceService
         'accountability' => 0.25,
     ];
 
+    public function getDomainAverages(string $countryId): array
+    {
+        $windowStart = Carbon::now()->subMonths(12);
+        $domains     = $this->collectDomains($countryId, $windowStart);
+
+        return [
+            'governance'     => round($this->domainAvg($domains['governance']), 2),
+            'fiscal'         => round($this->domainAvg($domains['fiscal']), 2),
+            'accountability' => round($this->domainAvg($domains['accountability']), 2),
+            'weights'        => self::DOMAIN_WEIGHTS,
+        ];
+    }
+
+    public function getMonthlyHistory(string $countryId): array
+    {
+        $windowStart = Carbon::now()->subMonths(12);
+        $domains     = $this->collectDomains($countryId, $windowStart);
+
+        $months = [];
+
+        for ($i = 11; $i >= 0; $i--) {
+            $from   = Carbon::now()->startOfMonth()->subMonths($i);
+            $before = $from->copy()->addMonth();
+            $sliced = $this->filterDomains($domains, $from, $before);
+
+            $months[] = [
+                'month'          => $from->format('Y-m'),
+                'weighted_score' => round($this->weightedScore($sliced), 2),
+            ];
+        }
+
+        return $months;
+    }
+
     public function getNationalRiskSummary(string $countryId): array
     {
         return Cache::remember(
