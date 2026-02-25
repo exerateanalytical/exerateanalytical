@@ -93,6 +93,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::put('/countries/{country}/institutions/{institution}', [InstitutionController::class, 'update'])->name('countries.institutions.update');
         Route::delete('/countries/{country}/institutions/{institution}', [InstitutionController::class, 'destroy'])->name('countries.institutions.destroy');
 
+        // Development data ingestion and recalculation
+        Route::post('/development', [DevelopmentController::class, 'store'])->name('development.store');
+        Route::post('/development/{country}/{year}/recalculate', [DevelopmentController::class, 'recalculate'])->name('development.recalculate');
+
         // Governance management
         Route::post('/governance/{country}/{year}/recalculate', [GovernanceController::class, 'recalculate'])->name('governance.recalculate');
         Route::get('/governance/{country}/{year}/sensitivity', [GovernanceController::class, 'sensitivity'])->name('governance.sensitivity');

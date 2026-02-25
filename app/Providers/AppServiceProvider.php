@@ -5,10 +5,12 @@ namespace App\Providers;
 use App\Models\Country;
 use App\Models\Institution;
 use App\Models\Region;
+use App\Models\ServiceAccessRecord;
 use App\Observers\CountryObserver;
 use App\Observers\InstitutionObserver;
 use App\Observers\RegionObserver;
 use App\Policies\CountryPolicy;
+use App\Policies\DevelopmentPolicy;
 use App\Policies\InstitutionPolicy;
 use App\Policies\RegionPolicy;
 use App\Repositories\Contracts\CountryRepositoryInterface;
@@ -53,6 +55,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Country::class, CountryPolicy::class);
         Gate::policy(Region::class, RegionPolicy::class);
         Gate::policy(Institution::class, InstitutionPolicy::class);
+        Gate::policy(ServiceAccessRecord::class, DevelopmentPolicy::class);
 
         // API rate limiting
         RateLimiter::for('api', function (Request $request) {
