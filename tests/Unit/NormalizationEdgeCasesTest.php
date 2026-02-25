@@ -6,7 +6,6 @@ use App\Models\Indicator;
 use App\Models\IndicatorValue;
 use App\Models\Pillar;
 use App\Services\Governance\GovernanceIndexService;
-use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
     $this->service = new GovernanceIndexService();
@@ -44,7 +43,7 @@ it('minmax normalization with all identical values throws DataIntegrityException
         ->toThrow(DataIntegrityException::class, 'Division by zero: min equals max');
 });
 
-it('zscore normalization with a single value logs a warning and returns without modifying', function () {
+it('zscore normalization with fewer than 2 values throws DataIntegrityException', function () {
     $indicator = Indicator::create([
         'pillar_id' => $this->pillar->id,
         'country_id' => $this->country->id,
@@ -55,19 +54,15 @@ it('zscore normalization with a single value logs a warning and returns without 
         'version' => 1,
     ]);
 
-    $value = IndicatorValue::create([
+    IndicatorValue::create([
         'indicator_id' => $indicator->id,
         'country_id' => $this->country->id,
         'year' => 2023,
         'raw_value' => 55,
     ]);
 
-    Log::shouldReceive('warning')->once()->with('Insufficient data for z-score normalization');
-
-    $this->service->normalizeIndicator($indicator->id, $this->country->id, 2023);
-
-    // normalized_value should remain null since the method returned early
-    expect($value->fresh()->normalized_value)->toBeNull();
+    expect(fn () => $this->service->normalizeIndicator($indicator->id, $this->country->id, 2023))
+        ->toThrow(DataIntegrityException::class, 'at least 2 values required');
 });
 
 it('minmax normalization with negative values produces correct results', function () {
