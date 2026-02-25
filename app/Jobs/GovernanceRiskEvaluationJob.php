@@ -60,6 +60,13 @@ class GovernanceRiskEvaluationJob implements ShouldQueue
                 'severity' => $dropPercent > 20 ? 'critical' : 'high',
                 'module' => 'Governance',
                 'description' => "Governance score dropped by " . round($dropPercent, 2) . "% YoY.",
+                'metadata'    => [
+                    'previous_year'  => $this->year - 1,
+                    'current_year'   => $this->year,
+                    'previous_score' => $previousScore,
+                    'current_score'  => $currentScore,
+                    'drop_percent'   => round($dropPercent, 2),
+                ],
                 'is_escalated' => false,
                 'triggered_at' => now(),
             ]);

@@ -9,6 +9,6 @@ class TriggerGovernanceRecalculationListener
 {
     public function handle(CountryUpdated $event): void
     {
-        RecalculateGovernanceScoreJob::dispatch($event->country, now()->year);
+        RecalculateGovernanceScoreJob::dispatch($event->country->id, now()->year);
     }
 }

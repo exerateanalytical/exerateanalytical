@@ -2,8 +2,9 @@
 
 namespace App\Jobs;
 
-use App\Exceptions\ScoreComputationException;
+use App\Events\GovernanceScoreRecalculated;
 use App\Models\Country;
+use App\Services\Governance\GovernanceIndexService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -17,34 +18,27 @@ class RecalculateGovernanceScoreJob implements ShouldQueue
     public int $tries = 3;
     public int $backoff = 60;
 
-    public function __construct(public readonly Country $country, public readonly int $year) {}
+    public function __construct(public readonly string $countryId, public readonly int $year) {}
 
-    public function handle(): void
+    public function handle(GovernanceIndexService $service): void
     {
         Log::info('Recalculating governance score', [
-            'country_id' => $this->country->id,
+            'country_id' => $this->countryId,
             'year' => $this->year,
         ]);
 
-        try {
-            // Score computation logic will be implemented in the GovernanceService
-        } catch (\Throwable $e) {
-            Log::error('Governance score computation failed', [
-                'country_id' => $this->country->id,
-                'year' => $this->year,
-                'error' => $e->getMessage(),
-            ]);
+        // calculateCompositeScore() dispatches GovernanceRiskEvaluationJob internally
+        // when regionId is null. Orchestration ownership moves to job layer in Batch 3.
+        $score = $service->calculateCompositeScore($this->countryId, null, $this->year);
 
-            throw new ScoreComputationException(
-                "Failed to compute governance score for country [{$this->country->id}] year [{$this->year}]: {$e->getMessage()}"
-            );
-        }
+        $country = Country::findOrFail($this->countryId);
+        GovernanceScoreRecalculated::dispatch($country, $this->year, (float) $score->composite_score);
     }
 
     public function failed(\Throwable $exception): void
     {
         Log::critical('RecalculateGovernanceScoreJob failed permanently', [
-            'country_id' => $this->country->id,
+            'country_id' => $this->countryId,
             'year' => $this->year,
             'error' => $exception->getMessage(),
         ]);
