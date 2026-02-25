@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Accountability\AccountabilityEntityResource;
+use App\Http\Resources\Accountability\AccountabilityScoreResource;
 use App\Models\AccountabilityEntity;
 use App\Models\Institution;
 use App\Services\Accountability\AccountabilityMatrixService;
@@ -60,10 +61,12 @@ class AccountabilityController extends Controller
 
         $score = $this->service->calculateCompositeAccountability($entityId);
 
+        Cache::forget("accountability:{$countryId}:{$entity->year}");
+
         return response()->json([
             'status' => 'success',
             'message' => 'Accountability score recalculated.',
-            'data' => $score,
+            'data' => new AccountabilityScoreResource($score),
         ]);
     }
 }

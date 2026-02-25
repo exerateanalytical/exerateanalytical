@@ -13,7 +13,7 @@ class BudgetAllocation extends Model
 
     protected $fillable = [
         'country_id', 'region_id', 'year', 'sector_name', 'allocated_amount',
-        'executed_amount', 'source_title', 'source_url',
+        'executed_amount', 'execution_rate', 'delay_flag', 'source_title', 'source_url',
     ];
 
     protected $casts = [

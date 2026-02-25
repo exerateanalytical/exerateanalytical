@@ -11,11 +11,13 @@ use App\Services\Accountability\AccountabilityMatrixService;
 beforeEach(function () {
     $this->service = new AccountabilityMatrixService();
     $this->country = Country::factory()->create();
+    $this->institution = Institution::factory()->create(['country_id' => $this->country->id]);
 });
 
 it('calculateBudgetExecutionScore returns 0.0 when entity has no linked budgets', function () {
     $entity = AccountabilityEntity::create([
         'country_id' => $this->country->id,
+        'institution_id' => $this->institution->id,
         'year' => 2023,
         'mandate_area' => 'Education',
     ]);
@@ -28,6 +30,7 @@ it('calculateBudgetExecutionScore returns 0.0 when entity has no linked budgets'
 it('calculateBudgetExecutionScore returns the average execution rate of linked budgets', function () {
     $entity = AccountabilityEntity::create([
         'country_id' => $this->country->id,
+        'institution_id' => $this->institution->id,
         'year' => 2023,
         'mandate_area' => 'Health',
     ]);
@@ -40,6 +43,8 @@ it('calculateBudgetExecutionScore returns the average execution rate of linked b
         'executed_amount' => 800000,
         'execution_rate' => 80.00,
         'delay_flag' => false,
+        'source_title' => 'Health Budget Report',
+        'source_url' => 'https://example.com/health-budget',
     ]);
     $budget2 = BudgetAllocation::create([
         'country_id' => $this->country->id,
@@ -49,6 +54,8 @@ it('calculateBudgetExecutionScore returns the average execution rate of linked b
         'executed_amount' => 1600000,
         'execution_rate' => 60.00,
         'delay_flag' => false,
+        'source_title' => 'Tertiary Health Report',
+        'source_url' => 'https://example.com/tertiary-health',
     ]);
 
     AccountabilityLink::create(['accountability_entity_id' => $entity->id, 'linked_budget_id' => $budget1->id]);
@@ -82,19 +89,22 @@ it('calculateCompositeAccountability uses weights of 0.3, 0.3, 0.3, 0.1', functi
         'executed_amount' => 900000,
         'execution_rate' => 90.00,
         'delay_flag' => false,
+        'source_title' => 'Finance Budget Report',
+        'source_url' => 'https://example.com/finance-budget',
     ]);
     AccountabilityLink::create(['accountability_entity_id' => $entity->id, 'linked_budget_id' => $budget->id]);
 
     $accountabilityScore = $this->service->calculateCompositeAccountability($entity->id);
 
-    // budget_score = 90, delivery_score = 100 (no delays), service_score = 0 (no region/records), transparency = 80
-    // composite = (90 * 0.3) + (100 * 0.3) + (0 * 0.3) + (80 * 0.1) = 27 + 30 + 0 + 8 = 65
-    expect((float) $accountabilityScore->composite_accountability_score)->toBe(65.0);
+    // budget_score = 90, delivery_score = 100 (no delays), service_score = 50 (no region, default neutral), transparency = 80
+    // composite = (90 * 0.3) + (100 * 0.3) + (50 * 0.3) + (80 * 0.1) = 27 + 30 + 15 + 8 = 80
+    expect((float) $accountabilityScore->composite_accountability_score)->toBe(80.0);
 });
 
 it('composite score is clamped to 0 at minimum', function () {
     $entity = AccountabilityEntity::create([
         'country_id' => $this->country->id,
+        'institution_id' => $this->institution->id,
         'year' => 2023,
         'mandate_area' => 'Infrastructure',
     ]);
@@ -128,6 +138,8 @@ it('composite score is clamped to 100 at maximum', function () {
         'executed_amount' => 5000000,
         'execution_rate' => 100.00,
         'delay_flag' => false,
+        'source_title' => 'Energy Budget Report',
+        'source_url' => 'https://example.com/energy-budget',
     ]);
     AccountabilityLink::create(['accountability_entity_id' => $entity->id, 'linked_budget_id' => $budget->id]);
 
@@ -139,6 +151,7 @@ it('composite score is clamped to 100 at maximum', function () {
 it('calculateCompositeAccountability persists an AccountabilityScore record', function () {
     $entity = AccountabilityEntity::create([
         'country_id' => $this->country->id,
+        'institution_id' => $this->institution->id,
         'year' => 2023,
         'mandate_area' => 'Water',
     ]);
