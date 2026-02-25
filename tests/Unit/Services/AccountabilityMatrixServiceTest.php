@@ -170,3 +170,23 @@ it('calculateCompositeAccountability persists an AccountabilityScore record', fu
     expect($record)->not->toBeNull();
     expect($record->accountability_entity_id)->toBe($entity->id);
 });
+
+it('calculateCompositeAccountability uses transparency_score from soft-deleted institution', function () {
+    $institution = Institution::factory()->create([
+        'country_id' => $this->country->id,
+        'transparency_score' => 75.00,
+    ]);
+
+    $entity = AccountabilityEntity::create([
+        'country_id' => $this->country->id,
+        'institution_id' => $institution->id,
+        'year' => 2023,
+        'mandate_area' => 'Justice',
+    ]);
+
+    $institution->delete(); // soft-delete
+
+    $accountabilityScore = $this->service->calculateCompositeAccountability($entity->id);
+
+    expect((float) $accountabilityScore->transparency_score)->toBe(75.0);
+});

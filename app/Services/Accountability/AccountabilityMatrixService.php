@@ -100,7 +100,8 @@ class AccountabilityMatrixService
         $deliveryScore = $this->calculateDeliveryScore($entityId);
         $serviceScore = $this->calculateServiceImpactScore($entityId);
 
-        $entity = AccountabilityEntity::findOrFail($entityId);
+        $entity = AccountabilityEntity::with(['institution' => fn ($q) => $q->withTrashed()])
+            ->findOrFail($entityId);
         $transparencyScore = (float) ($entity->institution?->transparency_score ?? 50);
 
         $composite = ($budgetScore * 0.3) + ($deliveryScore * 0.3) + ($serviceScore * 0.3) + ($transparencyScore * 0.1);
