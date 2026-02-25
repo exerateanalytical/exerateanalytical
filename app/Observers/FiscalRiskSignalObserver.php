@@ -11,4 +11,14 @@ class FiscalRiskSignalObserver
     {
         Cache::forget("risk:intelligence:{$signal->country_id}");
     }
+
+    public function updated(FiscalRiskSignal $signal): void
+    {
+        Cache::forget("risk:intelligence:{$signal->country_id}");
+    }
+
+    public function deleted(FiscalRiskSignal $signal): void
+    {
+        Cache::forget("risk:intelligence:{$signal->country_id}");
+    }
 }
