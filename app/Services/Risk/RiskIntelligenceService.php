@@ -10,14 +10,14 @@ use Illuminate\Support\Facades\Cache;
 
 class RiskIntelligenceService
 {
-    private const SEVERITY_MAP = [
+    protected const SEVERITY_MAP = [
         'low'      => 25,
         'moderate' => 50,
         'high'     => 75,
         'critical' => 100,
     ];
 
-    private const DOMAIN_WEIGHTS = [
+    protected const DOMAIN_WEIGHTS = [
         'governance'     => 0.4,
         'fiscal'         => 0.35,
         'accountability' => 0.25,
@@ -139,14 +139,14 @@ class RiskIntelligenceService
         ];
     }
 
-    private function weightedScore(array $domains): float
+    protected function weightedScore(array $domains): float
     {
         return ($this->domainAvg($domains['governance'])     * self::DOMAIN_WEIGHTS['governance'])
             + ($this->domainAvg($domains['fiscal'])          * self::DOMAIN_WEIGHTS['fiscal'])
             + ($this->domainAvg($domains['accountability'])  * self::DOMAIN_WEIGHTS['accountability']);
     }
 
-    private function filterDomains(array $domains, Carbon $from, ?Carbon $before = null): array
+    protected function filterDomains(array $domains, Carbon $from, ?Carbon $before = null): array
     {
         $slice = fn (Collection $signals) => $signals->filter(
             fn ($s) => $s['triggered_at']
@@ -161,7 +161,7 @@ class RiskIntelligenceService
         ];
     }
 
-    private function domainAvg(Collection $signals): float
+    protected function domainAvg(Collection $signals): float
     {
         if ($signals->isEmpty()) {
             return 0.0;
@@ -170,12 +170,12 @@ class RiskIntelligenceService
         return $signals->avg(fn ($s) => $this->normalizeSeverity($s['severity']));
     }
 
-    private function normalizeSeverity(string $severity): int
+    protected function normalizeSeverity(string $severity): int
     {
         return self::SEVERITY_MAP[strtolower($severity)] ?? 50;
     }
 
-    private function deriveRiskLevel(float $score): string
+    protected function deriveRiskLevel(float $score): string
     {
         return match (true) {
             $score <= 25 => 'low',
@@ -185,7 +185,7 @@ class RiskIntelligenceService
         };
     }
 
-    private function computeTrend(array $domains): string
+    protected function computeTrend(array $domains): string
     {
         $now           = Carbon::now();
         $recentCutoff  = $now->copy()->subDays(30);

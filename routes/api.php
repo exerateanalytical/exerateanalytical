@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\FiscalController;
 use App\Http\Controllers\Api\V1\GovernanceController;
 use App\Http\Controllers\Api\V1\InstitutionController;
 use App\Http\Controllers\Api\V1\RegionController;
+use App\Http\Controllers\Api\V1\RegionalRiskIntelligenceController;
 use App\Http\Controllers\Api\V1\RiskIntelligenceController;
 use App\Http\Controllers\Api\V1\TransparencyController;
 use Illuminate\Http\Request;
@@ -67,6 +68,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Risk Intelligence
         Route::get('/risk-intelligence/{country}', [RiskIntelligenceController::class, 'show'])->name('risk.intelligence');
+
+        // Regional Risk Intelligence
+        Route::get('/risk/regional/{country}', [RegionalRiskIntelligenceController::class, 'ranking'])->name('risk.regional.ranking');
+        Route::get('/risk/regional/{country}/{region}', [RegionalRiskIntelligenceController::class, 'detail'])->name('risk.regional.detail');
 
         // Executive Risk Dashboard
         Route::prefix('dashboard')->name('dashboard.')->group(function () {
