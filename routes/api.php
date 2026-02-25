@@ -37,8 +37,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/countries/{country}/institutions/{institution}', [InstitutionController::class, 'show'])->name('countries.institutions.show');
 
         // Governance
-        Route::get('/governance/{country}/{year}', [GovernanceController::class, 'show'])->name('governance.show');
-        Route::get('/governance/{country}/{region}/{year}', [GovernanceController::class, 'showRegional'])->name('governance.regional');
+        Route::get('/governance/{country}/{year}', [GovernanceController::class, 'show'])->whereNumber('year')->name('governance.show');
+        Route::get('/governance/{country}/{region}/{year}', [GovernanceController::class, 'showRegional'])->whereNumber('year')->name('governance.regional');
         Route::get('/governance/{country}/trend', [GovernanceController::class, 'trend'])->name('governance.trend');
 
         // Fiscal

@@ -26,6 +26,7 @@ class GovernanceIndexService
         $indicator = Indicator::findOrFail($indicatorId);
 
         $values = IndicatorValue::where('indicator_id', $indicatorId)
+            ->where('country_id', $countryId)
             ->where('year', $year)
             ->get();
 
