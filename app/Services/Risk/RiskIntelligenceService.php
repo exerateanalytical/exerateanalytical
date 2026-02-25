@@ -72,6 +72,98 @@ class RiskIntelligenceService
         );
     }
 
+    public function simulateRegionalShock(
+        string $countryId,
+        string $regionId,
+        float $shockPercent
+    ): array {
+        // Step a: baseline national summary (served from cache; no extra DB hit)
+        $national             = $this->getNationalRiskSummary($countryId);
+        $baselineNationalRisk = $national['national_risk_score'];
+
+        // Steps b/c: collect regional domains and build monthly history
+        $windowStart    = Carbon::now()->subMonths(12);
+        $domains        = $this->collectRegionalDomainsForConcentration($countryId, $regionId, $windowStart);
+        $monthlyHistory = $this->computeMonthlyScores($domains);
+
+        // Baseline regional score and fragility
+        $baselineScore      = round($this->weightedScore($domains), 2);
+        $baselineVolatility = $this->computeVolatilityMetrics($monthlyHistory);
+        $baselineFragility  = $this->computeFragilityMetrics(
+            $baselineScore,
+            $baselineVolatility['volatility_index'],
+            $baselineVolatility['acceleration']
+        )['fragility_index'];
+
+        // Step d: apply shock to last 3 months of monthly history
+        $shockedHistory = $monthlyHistory;
+        $n              = count($shockedHistory);
+
+        for ($i = max(0, $n - 3); $i < $n; $i++) {
+            $shockedHistory[$i]['weighted_score'] = round(
+                min(100.0, $shockedHistory[$i]['weighted_score'] * (1 + $shockPercent / 100)),
+                2
+            );
+        }
+
+        // Step e: recompute volatility and fragility from shocked history
+        $shockedScores      = array_column($shockedHistory, 'weighted_score');
+        $postShockScore     = count($shockedScores) >= 3
+            ? round(array_sum(array_slice($shockedScores, -3)) / 3, 2)
+            : $baselineScore;
+        $shockedVolatility  = $this->computeVolatilityMetrics($shockedHistory);
+        $postShockFragility = $this->computeFragilityMetrics(
+            $postShockScore,
+            $shockedVolatility['volatility_index'],
+            $shockedVolatility['acceleration']
+        )['fragility_index'];
+
+        // Step f: rebuild concentration pool with shocked region replaced
+        $baselinePool  = [];
+        $postShockPool = [];
+
+        foreach (Region::where('country_id', $countryId)->get() as $region) {
+            $rDomains    = $this->collectRegionalDomainsForConcentration($countryId, $region->id, $windowStart);
+            $rScore      = round($this->weightedScore($rDomains), 2);
+            $rVolMetrics = $this->computeVolatilityMetrics($this->computeMonthlyScores($rDomains));
+            $rFragility  = $this->computeFragilityMetrics(
+                $rScore,
+                $rVolMetrics['volatility_index'],
+                $rVolMetrics['acceleration']
+            )['fragility_index'];
+
+            $baselinePool[]  = $rFragility;
+            $postShockPool[] = ($region->id === $regionId) ? $postShockFragility : $rFragility;
+        }
+
+        $baselineGini       = $this->calculateGini($baselinePool);
+        $postShockGini      = $this->calculateGini($postShockPool);
+        $concentrationDelta = round($postShockGini - $baselineGini, 4);
+
+        // Shift the national risk by the mean change across the fragility pool
+        $poolCount             = count($baselinePool);
+        $poolMeanShift         = $poolCount > 0
+            ? (array_sum($postShockPool) - array_sum($baselinePool)) / $poolCount
+            : 0.0;
+        $postShockNationalRisk = round(min(100.0, max(0.0, $baselineNationalRisk + $poolMeanShift)), 2);
+
+        $fragilityDelta  = round($postShockFragility - $baselineFragility, 2);
+        $riskDelta       = round($postShockNationalRisk - $baselineNationalRisk, 2);
+        // Divergence delta: change in (regional_fragility − national_risk) after shock
+        $divergenceDelta = round($fragilityDelta - $riskDelta, 2);
+
+        return [
+            'baseline_national_risk'   => $baselineNationalRisk,
+            'post_shock_national_risk' => $postShockNationalRisk,
+            'risk_delta'               => $riskDelta,
+            'baseline_fragility'       => $baselineFragility,
+            'post_shock_fragility'     => $postShockFragility,
+            'fragility_delta'          => $fragilityDelta,
+            'concentration_delta'      => $concentrationDelta,
+            'divergence_delta'         => $divergenceDelta,
+        ];
+    }
+
     private function computeSummary(string $countryId): array
     {
         $windowStart = Carbon::now()->subMonths(12);
