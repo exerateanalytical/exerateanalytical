@@ -16,9 +16,20 @@ class RiskIntelligenceService
         'critical' => 100,
     ];
 
+    private const DOMAIN_WEIGHTS = [
+        'governance'     => 0.4,
+        'fiscal'         => 0.35,
+        'accountability' => 0.25,
+    ];
+
     public function getNationalRiskSummary(string $countryId): array
     {
-        $allSignals = $this->collectSignals($countryId);
+        $windowStart = Carbon::now()->subMonths(12);
+        $domains     = $this->collectDomains($countryId, $windowStart);
+
+        $allSignals = $domains['governance']
+            ->concat($domains['fiscal'])
+            ->concat($domains['accountability']);
 
         if ($allSignals->isEmpty()) {
             return [
@@ -32,7 +43,9 @@ class RiskIntelligenceService
         }
 
         $nationalRiskScore = round(
-            $allSignals->avg(fn ($s) => $this->normalizeSeverity($s['severity'])),
+            ($this->domainAvg($domains['governance'])    * self::DOMAIN_WEIGHTS['governance'])
+            + ($this->domainAvg($domains['fiscal'])        * self::DOMAIN_WEIGHTS['fiscal'])
+            + ($this->domainAvg($domains['accountability']) * self::DOMAIN_WEIGHTS['accountability']),
             2
         );
 
@@ -40,11 +53,8 @@ class RiskIntelligenceService
             'national_risk_score' => $nationalRiskScore,
             'risk_level'          => $this->deriveRiskLevel($nationalRiskScore),
             'trend'               => $this->computeTrend($allSignals),
-            'active_categories'   => $allSignals
-                ->pluck('category')
-                ->filter()
-                ->unique()
-                ->sort()
+            'active_categories'   => collect(['accountability', 'fiscal', 'governance'])
+                ->filter(fn ($domain) => $domains[$domain]->isNotEmpty())
                 ->values()
                 ->all(),
             'signal_count'        => $allSignals->count(),
@@ -56,31 +66,39 @@ class RiskIntelligenceService
         ];
     }
 
-    private function collectSignals(string $countryId): Collection
+    private function collectDomains(string $countryId, Carbon $windowStart): array
     {
-        $signals = collect();
-
-        RiskSignal::where('country_id', $countryId)
+        $governance = RiskSignal::where('country_id', $countryId)
+            ->where('module', 'Governance')
+            ->where('triggered_at', '>=', $windowStart)
             ->get()
-            ->each(function ($s) use ($signals) {
-                $signals->push([
-                    'severity'     => $s->severity,
-                    'category'     => $s->module ?? 'Unknown',
-                    'triggered_at' => $s->triggered_at,
-                ]);
-            });
+            ->map(fn ($s) => ['severity' => $s->severity, 'triggered_at' => $s->triggered_at]);
 
-        FiscalRiskSignal::where('country_id', $countryId)
+        $accountability = RiskSignal::where('country_id', $countryId)
+            ->where('module', 'Accountability')
+            ->where('triggered_at', '>=', $windowStart)
             ->get()
-            ->each(function ($s) use ($signals) {
-                $signals->push([
-                    'severity'     => $s->severity,
-                    'category'     => $s->risk_type,
-                    'triggered_at' => $s->triggered_at,
-                ]);
-            });
+            ->map(fn ($s) => ['severity' => $s->severity, 'triggered_at' => $s->triggered_at]);
 
-        return $signals;
+        $fiscal = FiscalRiskSignal::where('country_id', $countryId)
+            ->where('triggered_at', '>=', $windowStart)
+            ->get()
+            ->map(fn ($s) => ['severity' => $s->severity, 'triggered_at' => $s->triggered_at]);
+
+        return [
+            'governance'     => $governance,
+            'fiscal'         => $fiscal,
+            'accountability' => $accountability,
+        ];
+    }
+
+    private function domainAvg(Collection $signals): float
+    {
+        if ($signals->isEmpty()) {
+            return 0.0;
+        }
+
+        return $signals->avg(fn ($s) => $this->normalizeSeverity($s['severity']));
     }
 
     private function normalizeSeverity(string $severity): int
@@ -100,9 +118,9 @@ class RiskIntelligenceService
 
     private function computeTrend(Collection $allSignals): string
     {
-        $now            = Carbon::now();
-        $recentCutoff   = $now->copy()->subDays(30);
-        $baselineStart  = $now->copy()->subDays(90);
+        $now           = Carbon::now();
+        $recentCutoff  = $now->copy()->subDays(30);
+        $baselineStart = $now->copy()->subDays(90);
 
         $recent = $allSignals->filter(
             fn ($s) => $s['triggered_at'] && $s['triggered_at']->gte($recentCutoff)
@@ -118,7 +136,7 @@ class RiskIntelligenceService
             return 'stable';
         }
 
-        $recentAvg   = $recent->isEmpty()
+        $recentAvg = $recent->isEmpty()
             ? 0.0
             : $recent->avg(fn ($s) => $this->normalizeSeverity($s['severity']));
 
