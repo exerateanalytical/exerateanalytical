@@ -3,6 +3,7 @@
 namespace App\Services\Risk;
 
 use App\Models\FiscalRiskSignal;
+use App\Models\Region;
 use App\Models\RiskSignal;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -93,8 +94,11 @@ class RiskIntelligenceService
                 'volatility_index'    => 0.0,
                 'acceleration'        => 0.0,
                 'stability_label'     => 'stable',
-                'fragility_index'     => 0.0,
-                'fragility_label'     => 'resilient',
+                'fragility_index'          => 0.0,
+                'fragility_label'          => 'resilient',
+                'risk_concentration_index' => 0.0,
+                'concentration_label'      => 'evenly_distributed',
+                'top_20_percent_share'     => 0.0,
             ];
         }
 
@@ -107,31 +111,102 @@ class RiskIntelligenceService
             ->all();
         $signalCount        = $allSignals->count();
         $volatilityMetrics  = $this->computeVolatilityMetrics($this->computeMonthlyScores($domains));
-        $fragilityMetrics   = $this->computeFragilityMetrics(
+        $fragilityMetrics     = $this->computeFragilityMetrics(
             $nationalRiskScore,
             $volatilityMetrics['volatility_index'],
             $volatilityMetrics['acceleration']
         );
+        $concentrationMetrics = $this->computeConcentrationMetrics($countryId);
 
         return [
-            'national_risk_score' => $nationalRiskScore,
-            'risk_level'          => $riskLevel,
-            'trend'               => $trend,
-            'active_categories'   => $activeCategories,
-            'signal_count'        => $signalCount,
-            'last_updated'        => $allSignals
+            'national_risk_score'      => $nationalRiskScore,
+            'risk_level'               => $riskLevel,
+            'trend'                    => $trend,
+            'active_categories'        => $activeCategories,
+            'signal_count'             => $signalCount,
+            'last_updated'             => $allSignals
                 ->pluck('triggered_at')
                 ->filter()
                 ->max()
                 ?->toIso8601String(),
-            'confidence'          => $signalCount >= 3 ? 'normal' : 'low',
-            'executive_summary'   => $this->buildExecutiveSummary($riskLevel, $trend, $activeCategories),
-            'volatility_index'    => $volatilityMetrics['volatility_index'],
-            'acceleration'        => $volatilityMetrics['acceleration'],
-            'stability_label'     => $volatilityMetrics['stability_label'],
-            'fragility_index'     => $fragilityMetrics['fragility_index'],
-            'fragility_label'     => $fragilityMetrics['fragility_label'],
+            'confidence'               => $signalCount >= 3 ? 'normal' : 'low',
+            'executive_summary'        => $this->buildExecutiveSummary($riskLevel, $trend, $activeCategories),
+            'volatility_index'         => $volatilityMetrics['volatility_index'],
+            'acceleration'             => $volatilityMetrics['acceleration'],
+            'stability_label'          => $volatilityMetrics['stability_label'],
+            'fragility_index'          => $fragilityMetrics['fragility_index'],
+            'fragility_label'          => $fragilityMetrics['fragility_label'],
+            'risk_concentration_index' => $concentrationMetrics['risk_concentration_index'],
+            'concentration_label'      => $concentrationMetrics['concentration_label'],
+            'top_20_percent_share'     => $concentrationMetrics['top_20_percent_share'],
         ];
+    }
+
+    protected function computeConcentrationMetrics(string $countryId): array
+    {
+        $regional        = new RegionalRiskIntelligenceService();
+        $fragilityValues = Region::where('country_id', $countryId)
+            ->get()
+            ->map(fn ($region) => $regional->getRegionalRiskDetail($countryId, $region->id)['fragility_index'])
+            ->all();
+
+        $gini  = $this->calculateGini($fragilityValues);
+        $top20 = $this->calculateTop20Share($fragilityValues);
+
+        return [
+            'risk_concentration_index' => $gini,
+            'concentration_label'      => $this->deriveConcentrationLabel($gini),
+            'top_20_percent_share'     => $top20,
+        ];
+    }
+
+    private function calculateGini(array $values): float
+    {
+        $n = count($values);
+
+        if ($n < 2) {
+            return 0.0;
+        }
+
+        sort($values);
+
+        $sum = array_sum($values);
+
+        if ($sum == 0) {
+            return 0.0;
+        }
+
+        $numerator = 0.0;
+        foreach ($values as $i => $v) {
+            $numerator += ($i + 1) * $v;
+        }
+
+        return round((2 * $numerator) / ($n * $sum) - ($n + 1) / $n, 4);
+    }
+
+    private function calculateTop20Share(array $values): float
+    {
+        $total = array_sum($values);
+
+        if ($total == 0) {
+            return 0.0;
+        }
+
+        rsort($values);
+        $topCount = (int) ceil(0.2 * count($values));
+        $topSum   = array_sum(array_slice($values, 0, $topCount));
+
+        return round($topSum / $total, 4);
+    }
+
+    private function deriveConcentrationLabel(float $gini): string
+    {
+        return match (true) {
+            $gini <= 0.2 => 'evenly_distributed',
+            $gini <= 0.4 => 'moderately_concentrated',
+            $gini <= 0.6 => 'concentrated',
+            default      => 'highly_concentrated',
+        };
     }
 
     private function collectDomains(string $countryId, Carbon $windowStart): array

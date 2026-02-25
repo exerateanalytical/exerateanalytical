@@ -21,8 +21,11 @@ class RiskIntelligenceResource extends JsonResource
             'volatility_index'    => $this->resource['volatility_index'],
             'acceleration'        => $this->resource['acceleration'],
             'stability_label'     => $this->resource['stability_label'],
-            'fragility_index'     => $this->resource['fragility_index'],
-            'fragility_label'     => $this->resource['fragility_label'],
+            'fragility_index'          => $this->resource['fragility_index'],
+            'fragility_label'          => $this->resource['fragility_label'],
+            'risk_concentration_index' => $this->resource['risk_concentration_index'],
+            'concentration_label'      => $this->resource['concentration_label'],
+            'top_20_percent_share'     => $this->resource['top_20_percent_share'],
         ];
     }
 }
