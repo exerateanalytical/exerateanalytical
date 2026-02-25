@@ -15,6 +15,9 @@ class RegionalRiskDetailResource extends JsonResource
             'trend'               => $this->resource['trend'],
             'domain_averages'     => $this->resource['domain_averages'],
             'signal_count'        => $this->resource['signal_count'],
+            'volatility_index'    => $this->resource['volatility_index'],
+            'acceleration'        => $this->resource['acceleration'],
+            'stability_label'     => $this->resource['stability_label'],
         ];
     }
 }

@@ -18,6 +18,9 @@ class RiskIntelligenceResource extends JsonResource
             'last_updated'        => $this->resource['last_updated'],
             'confidence'          => $this->resource['confidence'],
             'executive_summary'   => $this->resource['executive_summary'],
+            'volatility_index'    => $this->resource['volatility_index'],
+            'acceleration'        => $this->resource['acceleration'],
+            'stability_label'     => $this->resource['stability_label'],
         ];
     }
 }

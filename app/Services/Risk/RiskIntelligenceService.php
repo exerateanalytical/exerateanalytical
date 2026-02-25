@@ -41,6 +41,11 @@ class RiskIntelligenceService
         $windowStart = Carbon::now()->subMonths(12);
         $domains     = $this->collectDomains($countryId, $windowStart);
 
+        return $this->computeMonthlyScores($domains);
+    }
+
+    protected function computeMonthlyScores(array $domains): array
+    {
         $months = [];
 
         for ($i = 11; $i >= 0; $i--) {
@@ -85,17 +90,21 @@ class RiskIntelligenceService
                 'last_updated'        => null,
                 'confidence'          => 'low',
                 'executive_summary'   => 'National risk posture is LOW and stable. Insufficient signal data for domain attribution.',
+                'volatility_index'    => 0.0,
+                'acceleration'        => 0.0,
+                'stability_label'     => 'stable',
             ];
         }
 
-        $nationalRiskScore = round($this->weightedScore($domains), 2);
-        $riskLevel         = $this->deriveRiskLevel($nationalRiskScore);
-        $trend             = $this->computeTrend($domains);
-        $activeCategories  = collect(['accountability', 'fiscal', 'governance'])
+        $nationalRiskScore  = round($this->weightedScore($domains), 2);
+        $riskLevel          = $this->deriveRiskLevel($nationalRiskScore);
+        $trend              = $this->computeTrend($domains);
+        $activeCategories   = collect(['accountability', 'fiscal', 'governance'])
             ->filter(fn ($domain) => $domains[$domain]->isNotEmpty())
             ->values()
             ->all();
-        $signalCount       = $allSignals->count();
+        $signalCount        = $allSignals->count();
+        $volatilityMetrics  = $this->computeVolatilityMetrics($this->computeMonthlyScores($domains));
 
         return [
             'national_risk_score' => $nationalRiskScore,
@@ -110,6 +119,9 @@ class RiskIntelligenceService
                 ?->toIso8601String(),
             'confidence'          => $signalCount >= 3 ? 'normal' : 'low',
             'executive_summary'   => $this->buildExecutiveSummary($riskLevel, $trend, $activeCategories),
+            'volatility_index'    => $volatilityMetrics['volatility_index'],
+            'acceleration'        => $volatilityMetrics['acceleration'],
+            'stability_label'     => $volatilityMetrics['stability_label'],
         ];
     }
 
@@ -214,6 +226,55 @@ class RiskIntelligenceService
         }
 
         return 'stable';
+    }
+
+    protected function computeVolatilityMetrics(array $monthlyHistory): array
+    {
+        $volatility = $this->calculateVolatility($monthlyHistory);
+
+        return [
+            'volatility_index' => $volatility,
+            'acceleration'     => $this->calculateAcceleration($monthlyHistory),
+            'stability_label'  => $this->deriveStabilityLabel($volatility),
+        ];
+    }
+
+    private function calculateVolatility(array $monthlyHistory): float
+    {
+        $scores = array_column($monthlyHistory, 'weighted_score');
+        $n      = count($scores);
+
+        if ($n === 0) {
+            return 0.0;
+        }
+
+        $mean     = array_sum($scores) / $n;
+        $variance = array_sum(array_map(fn ($s) => ($s - $mean) ** 2, $scores)) / $n;
+
+        return round(sqrt($variance), 2);
+    }
+
+    private function calculateAcceleration(array $monthlyHistory): float
+    {
+        $scores = array_column($monthlyHistory, 'weighted_score');
+
+        if (count($scores) < 6) {
+            return 0.0;
+        }
+
+        $recent   = array_slice($scores, -3);     // months 10-12
+        $previous = array_slice($scores, -6, 3);  // months 7-9
+
+        return round(array_sum($recent) / 3 - array_sum($previous) / 3, 2);
+    }
+
+    private function deriveStabilityLabel(float $volatility): string
+    {
+        return match (true) {
+            $volatility <= 5  => 'stable',
+            $volatility <= 15 => 'fluctuating',
+            default           => 'highly_unstable',
+        };
     }
 
     private function buildExecutiveSummary(string $riskLevel, string $trend, array $activeCategories): string

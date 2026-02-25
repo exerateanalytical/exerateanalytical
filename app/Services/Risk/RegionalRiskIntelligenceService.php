@@ -55,12 +55,16 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
                     'accountability' => 0.0,
                 ],
                 'signal_count'        => 0,
+                'volatility_index'    => 0.0,
+                'acceleration'        => 0.0,
+                'stability_label'     => 'stable',
             ];
         }
 
-        $score = round($this->weightedScore($domains), 2);
-        $level = $this->deriveRiskLevel($score);
-        $trend = $this->computeTrend($domains);
+        $score             = round($this->weightedScore($domains), 2);
+        $level             = $this->deriveRiskLevel($score);
+        $trend             = $this->computeTrend($domains);
+        $volatilityMetrics = $this->computeVolatilityMetrics($this->computeMonthlyScores($domains));
 
         return [
             'regional_risk_score' => $score,
@@ -72,6 +76,9 @@ class RegionalRiskIntelligenceService extends RiskIntelligenceService
                 'accountability' => round($this->domainAvg($domains['accountability']), 2),
             ],
             'signal_count'        => $allSignals->count(),
+            'volatility_index'    => $volatilityMetrics['volatility_index'],
+            'acceleration'        => $volatilityMetrics['acceleration'],
+            'stability_label'     => $volatilityMetrics['stability_label'],
         ];
     }
 
