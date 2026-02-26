@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\DevelopmentController;
 use App\Http\Controllers\Api\V1\ExecutiveAlertAnalyticsController;
 use App\Http\Controllers\Api\V1\ExecutiveAlertController;
 use App\Http\Controllers\Api\V1\ExecutiveBriefController;
+use App\Http\Controllers\Api\V1\ExecutiveGovernanceMetricsController;
 use App\Http\Controllers\Api\V1\ExecutiveNationalController;
 use App\Http\Controllers\Api\V1\ExecutiveNetworkRankingController;
 use App\Http\Controllers\Api\V1\ExecutiveRiskDashboardController;
@@ -86,6 +87,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/executive/brief/{country}', [ExecutiveBriefController::class, 'show'])->name('executive.brief');
         Route::get('/executive/alerts/{country}', [ExecutiveAlertController::class, 'show'])->name('executive.alerts');
         Route::get('/executive/alerts/{country}/metrics', [ExecutiveAlertAnalyticsController::class, 'metrics'])->name('executive.alerts.metrics');
+        Route::get('/executive/governance/{country}', [ExecutiveGovernanceMetricsController::class, 'metrics'])->name('executive.governance.metrics');
 
         // Executive Risk Dashboard
         Route::prefix('dashboard')->name('dashboard.')->group(function () {
