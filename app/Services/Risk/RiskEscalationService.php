@@ -67,7 +67,7 @@ class RiskEscalationService
                         $regionCode = $regionId
                             ? FederationRegion::where('id', $regionId)->value('code')
                             : null;
-                        broadcast(new RiskAlertStreamed($event, $regionCode));
+                        event(new RiskAlertStreamed($event, $regionCode));
                     });
 
                     $escalated++;
