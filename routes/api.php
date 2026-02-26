@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\CivicController;
 use App\Http\Controllers\Api\V1\CountryController;
 use App\Http\Controllers\Api\V1\DevelopmentController;
 use App\Http\Controllers\Api\V1\ExecutiveNationalController;
+use App\Http\Controllers\Api\V1\ExecutiveNetworkRankingController;
 use App\Http\Controllers\Api\V1\ExecutiveRiskDashboardController;
 use App\Http\Controllers\Api\V1\ExposureMatrixController;
 use App\Http\Controllers\Api\V1\FiscalController;
@@ -77,6 +78,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Executive National
         Route::get('/executive/national/{country}', [ExecutiveNationalController::class, 'show'])->name('executive.national');
+        Route::get('/executive/network-ranking', [ExecutiveNetworkRankingController::class, 'index'])->name('executive.network-ranking');
 
         // Executive Risk Dashboard
         Route::prefix('dashboard')->name('dashboard.')->group(function () {
