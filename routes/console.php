@@ -15,3 +15,6 @@ Artisan::command('inspire', function () {
 Schedule::job(new DailyDataIntegrityCheckJob)->daily();
 Schedule::job(new WeeklyScoreStabilityCheckJob)->weekly();
 Schedule::job(new MonthlyMethodologyConsistencyAuditJob)->monthly();
+
+// Risk alert escalation
+Schedule::command('risk:escalate')->everyFiveMinutes();
