@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\CountryController;
 use App\Http\Controllers\Api\V1\DevelopmentController;
 use App\Http\Controllers\Api\V1\ExecutiveNationalController;
 use App\Http\Controllers\Api\V1\ExecutiveRiskDashboardController;
+use App\Http\Controllers\Api\V1\ExposureMatrixController;
 use App\Http\Controllers\Api\V1\FiscalController;
 use App\Http\Controllers\Api\V1\GovernanceController;
 use App\Http\Controllers\Api\V1\InstitutionController;
@@ -128,5 +129,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Civic petitions (public submission allowed without auth, but admin review requires auth)
         Route::post('/civic/petitions', [\App\Http\Controllers\Api\V1\CivicController::class, 'storePetition'])->name('civic.petitions.store');
+
+        // Exposure Matrix management (SuperAdmin only via FormRequest)
+        Route::post('/exposure-matrix', [ExposureMatrixController::class, 'store'])->name('exposure-matrix.store');
+        Route::put('/exposure-matrix/{id}/activate', [ExposureMatrixController::class, 'activate'])->whereUuid('id')->name('exposure-matrix.activate');
+        Route::get('/exposure-matrix/active', [ExposureMatrixController::class, 'active'])->name('exposure-matrix.active');
     });
 });

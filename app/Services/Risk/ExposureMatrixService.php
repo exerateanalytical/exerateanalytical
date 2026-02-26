@@ -2,6 +2,8 @@
 
 namespace App\Services\Risk;
 
+use App\Models\ExposureMatrix;
+
 class ExposureMatrixService
 {
     /**
@@ -18,6 +20,6 @@ class ExposureMatrixService
      */
     public function getActiveMatrix(): ?array
     {
-        return null;
+        return ExposureMatrix::where('active', true)->first()?->matrix_json;
     }
 }
