@@ -39,7 +39,7 @@ class ExecutiveNationalResource extends JsonResource
                 'systemic_importance_score'  => $systemic['systemic_importance_score'] ?? null,
                 'outgoing_exposure_weight'   => $systemic['outgoing_exposure_weight'] ?? null,
                 'ranking_position'           => $this->resource['ranking_position'],
-                'total_countries'            => $this->resource['total_countries'],
+                'total_countries'            => $this->resource['total_countries'] ?? null,
             ],
         ];
     }
