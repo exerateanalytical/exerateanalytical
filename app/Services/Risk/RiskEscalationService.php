@@ -49,6 +49,7 @@ class RiskEscalationService
                     $event = RiskAlertEvent::create([
                         'risk_alert_id' => $alert->id,
                         'country_id'    => $alert->country_id,
+                        'region_id'     => $alert->region_id,
                         'type'          => $alert->type,
                         'event_type'    => 'escalated',
                         'severity'      => $newSeverity,
@@ -56,7 +57,7 @@ class RiskEscalationService
 
                     $this->notificationService->notify($event);
 
-                    Cache::forget("risk:analytics:{$alert->country_id}");
+                    Cache::forget('risk:analytics:' . ($alert->region_id ?? 'global') . ":{$alert->country_id}");
 
                     $escalated++;
                 }

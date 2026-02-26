@@ -11,6 +11,7 @@ class RiskAlert extends Model
 
     protected $fillable = [
         'country_id',
+        'region_id',
         'type',
         'severity',
         'active',

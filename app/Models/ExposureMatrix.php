@@ -16,6 +16,7 @@ class ExposureMatrix extends Model
         'version',
         'active',
         'created_by',
+        'region_id',
     ];
 
     protected $casts = [

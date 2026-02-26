@@ -2,6 +2,7 @@
 
 namespace App\Services\Risk;
 
+use App\Models\Country;
 use App\Models\RiskAlert;
 use App\Models\RiskAlertEvent;
 use Illuminate\Support\Carbon;
@@ -32,6 +33,9 @@ class RiskAlertPersistenceService
         $now            = Carbon::now();
         $evaluatedTypes = collect($evaluatedAlerts)->pluck('type')->all();
 
+        // Resolve federation region for the country (single value query)
+        $regionId = Country::where('id', $countryId)->value('region_id');
+
         $existing = RiskAlert::where('country_id', $countryId)->get()->keyBy('type');
 
         foreach ($evaluatedAlerts as $alert) {
@@ -43,11 +47,13 @@ class RiskAlertPersistenceService
                     'active'            => true,
                     'severity'          => $alert['severity'],
                     'last_triggered_at' => $now,
+                    'region_id'         => $regionId,
                 ]);
 
                 $event = RiskAlertEvent::create([
                     'risk_alert_id' => $record->id,
                     'country_id'    => $countryId,
+                    'region_id'     => $regionId,
                     'type'          => $alert['type'],
                     'event_type'    => $eventType,
                     'severity'      => $alert['severity'],
@@ -57,6 +63,7 @@ class RiskAlertPersistenceService
             } else {
                 $record = RiskAlert::create([
                     'country_id'         => $countryId,
+                    'region_id'          => $regionId,
                     'type'               => $alert['type'],
                     'severity'           => $alert['severity'],
                     'active'             => true,
@@ -67,6 +74,7 @@ class RiskAlertPersistenceService
                 $event = RiskAlertEvent::create([
                     'risk_alert_id' => $record->id,
                     'country_id'    => $countryId,
+                    'region_id'     => $regionId,
                     'type'          => $alert['type'],
                     'event_type'    => 'triggered',
                     'severity'      => $alert['severity'],
@@ -78,12 +86,13 @@ class RiskAlertPersistenceService
 
         $existing
             ->reject(fn (RiskAlert $alert) => in_array($alert->type, $evaluatedTypes, true))
-            ->each(function (RiskAlert $alert) {
+            ->each(function (RiskAlert $alert) use ($regionId) {
                 $alert->update(['active' => false]);
 
                 $event = RiskAlertEvent::create([
                     'risk_alert_id' => $alert->id,
                     'country_id'    => $alert->country_id,
+                    'region_id'     => $regionId ?? $alert->region_id,
                     'type'          => $alert->type,
                     'event_type'    => 'resolved',
                     'severity'      => $alert->severity,
@@ -92,7 +101,7 @@ class RiskAlertPersistenceService
                 $this->notificationService->notify($event);
             });
 
-        Cache::forget("risk:analytics:{$countryId}");
+        Cache::forget('risk:analytics:' . ($regionId ?? 'global') . ":{$countryId}");
 
         return RiskAlert::where('country_id', $countryId)
             ->where('active', true)

@@ -17,9 +17,11 @@ class SendRiskNotificationJob implements ShouldQueue
 
     public array $backoff = [10, 30, 60, 120, 300];
 
-    public function __construct(public readonly string $eventId)
-    {
-        $this->onQueue('risk-notifications');
+    public function __construct(
+        public readonly string $eventId,
+        public readonly ?string $regionCode = null,
+    ) {
+        $this->onQueue($regionCode ? "risk-notifications-{$regionCode}" : 'risk-notifications');
     }
 
     public function handle(RiskNotificationService $service): void

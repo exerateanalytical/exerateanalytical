@@ -6,6 +6,7 @@ use App\Enums\RiskTier;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -17,6 +18,7 @@ class Country extends Model
         'name',
         'iso_code',
         'continent_region',
+        'region_id',
         'risk_tier',
         'is_active',
     ];
@@ -25,6 +27,11 @@ class Country extends Model
         'risk_tier' => RiskTier::class,
         'is_active' => 'boolean',
     ];
+
+    public function federationRegion(): BelongsTo
+    {
+        return $this->belongsTo(FederationRegion::class, 'region_id');
+    }
 
     public function regions(): HasMany
     {

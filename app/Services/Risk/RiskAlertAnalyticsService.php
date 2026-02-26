@@ -10,14 +10,18 @@ use Illuminate\Support\Facades\Cache;
 class RiskAlertAnalyticsService
 {
     /**
-     * Compute alert analytics metrics for a country.
-     * Read-only. Results cached for 5 minutes; invalidated by persistence/escalation.
+     * Compute alert analytics metrics for a country, optionally scoped to a
+     * federation region. Results cached for 5 minutes; invalidated by
+     * persistence/escalation writes.
      */
-    public function metrics(string $countryId): array
+    public function metrics(string $countryId, ?string $regionId = null): array
     {
-        return Cache::remember("risk:analytics:{$countryId}", now()->addMinutes(5), function () use ($countryId) {
+        $cacheKey = 'risk:analytics:' . ($regionId ?? 'global') . ":{$countryId}";
+
+        return Cache::remember($cacheKey, now()->addMinutes(5), function () use ($countryId, $regionId) {
             // ── Event counts (one grouped query, replacing four separate counts) ──
             $eventCounts = RiskAlertEvent::where('country_id', $countryId)
+                ->when($regionId, fn ($q) => $q->where('region_id', $regionId))
                 ->whereIn('event_type', ['triggered', 'retriggered', 'resolved', 'acknowledged'])
                 ->selectRaw('event_type, count(*) as total')
                 ->groupBy('event_type')
@@ -30,6 +34,7 @@ class RiskAlertAnalyticsService
 
             // ── Mean time to acknowledge ──────────────────────────────────────
             $ackAlerts = RiskAlert::where('country_id', $countryId)
+                ->when($regionId, fn ($q) => $q->where('region_id', $regionId))
                 ->whereNotNull('acknowledged_at')
                 ->get(['first_triggered_at', 'acknowledged_at']);
 
@@ -44,6 +49,7 @@ class RiskAlertAnalyticsService
 
             // ── Mean time to resolve ──────────────────────────────────────────
             $resolvedEvents = RiskAlertEvent::where('country_id', $countryId)
+                ->when($regionId, fn ($q) => $q->where('region_id', $regionId))
                 ->where('event_type', 'resolved')
                 ->get(['risk_alert_id', 'created_at']);
 
@@ -54,6 +60,7 @@ class RiskAlertAnalyticsService
                     'id',
                     $resolvedEvents->pluck('risk_alert_id')->unique()->all()
                 )
+                    ->when($regionId, fn ($q) => $q->where('region_id', $regionId))
                     ->get(['id', 'first_triggered_at'])
                     ->keyBy('id');
 
@@ -78,6 +85,7 @@ class RiskAlertAnalyticsService
             $windowStart = Carbon::now()->subDays(30);
 
             $flappingScore = RiskAlertEvent::where('country_id', $countryId)
+                ->when($regionId, fn ($q) => $q->where('region_id', $regionId))
                 ->where('created_at', '>=', $windowStart)
                 ->whereIn('event_type', ['triggered', 'resolved'])
                 ->get(['risk_alert_id', 'event_type'])

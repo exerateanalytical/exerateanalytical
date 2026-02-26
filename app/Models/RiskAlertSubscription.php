@@ -11,6 +11,7 @@ class RiskAlertSubscription extends Model
 
     protected $fillable = [
         'country_id',
+        'region_id',
         'alert_type',
         'severity',
         'channel',

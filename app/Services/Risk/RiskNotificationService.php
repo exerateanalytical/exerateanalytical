@@ -3,6 +3,7 @@
 namespace App\Services\Risk;
 
 use App\Jobs\SendRiskNotificationJob;
+use App\Models\FederationRegion;
 use App\Models\RiskAlertEvent;
 use App\Services\Risk\Notifications\NotificationChannelInterface;
 use Illuminate\Support\Facades\Cache;
@@ -29,7 +30,13 @@ class RiskNotificationService
             return;
         }
 
-        DB::afterCommit(fn () => SendRiskNotificationJob::dispatch($event->id));
+        DB::afterCommit(function () use ($event) {
+            $regionCode = $event->region_id
+                ? FederationRegion::where('id', $event->region_id)->value('code')
+                : null;
+
+            SendRiskNotificationJob::dispatch($event->id, $regionCode);
+        });
     }
 
     public function dispatchNow(RiskAlertEvent $event): void

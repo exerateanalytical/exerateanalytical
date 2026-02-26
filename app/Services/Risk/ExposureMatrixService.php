@@ -22,4 +22,17 @@ class ExposureMatrixService
     {
         return ExposureMatrix::where('active', true)->first()?->matrix_json;
     }
+
+    /**
+     * Return the active exposure matrix scoped to a specific federation region,
+     * or null if none is configured for that region.
+     *
+     * @return array<string, array<string, float>>|null
+     */
+    public function getActiveMatrixForRegion(string $regionId): ?array
+    {
+        return ExposureMatrix::where('active', true)
+            ->where('region_id', $regionId)
+            ->first()?->matrix_json;
+    }
 }
