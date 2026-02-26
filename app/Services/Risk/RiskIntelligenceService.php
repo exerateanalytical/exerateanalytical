@@ -918,4 +918,34 @@ class RiskIntelligenceService
 
         return implode(', ', $items) . ' and ' . $last;
     }
+
+    public function buildStrategicBrief(array $summary): string
+    {
+        $riskLevel     = strtoupper($summary['risk_level']);
+        $trend         = $summary['trend'];
+        $stability     = str_replace('_', ' ', $summary['stability_label']);
+        $fragility     = $summary['fragility_label'] === 'critical'
+            ? 'critically fragile'
+            : $summary['fragility_label'];
+        $concentration = str_replace('_', ' ', $summary['concentration_label']);
+        $projection    = match ($summary['projection_trend']) {
+            'rising'  => 'upward',
+            'falling' => 'downward',
+            default   => 'stable',
+        };
+
+        $brief = "The national risk posture is currently {$riskLevel}, "
+               . "exhibiting a {$trend} trend across monitored domains. "
+               . "Underlying institutional capacity is assessed as {$fragility}, "
+               . "with {$stability} signal conditions observed over the analysis window. "
+               . "Risk signal distribution is {$concentration}, "
+               . "and near-term projections point {$projection}.";
+
+        if ($summary['regime_shift_detected']) {
+            $brief .= " A regime shift has been detected, indicating a material change "
+                    . "in the structural risk dynamics that warrants heightened strategic attention.";
+        }
+
+        return $brief;
+    }
 }
