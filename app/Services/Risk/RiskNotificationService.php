@@ -2,6 +2,7 @@
 
 namespace App\Services\Risk;
 
+use App\Jobs\SendRiskNotificationJob;
 use App\Models\RiskAlertEvent;
 use App\Services\Risk\Notifications\NotificationChannelInterface;
 use Illuminate\Support\Facades\Cache;
@@ -20,12 +21,10 @@ class RiskNotificationService
             return;
         }
 
-        DB::afterCommit(function () use ($event) {
-            $this->dispatch($event);
-        });
+        DB::afterCommit(fn () => SendRiskNotificationJob::dispatch($event->id));
     }
 
-    private function dispatch(RiskAlertEvent $event): void
+    public function dispatchNow(RiskAlertEvent $event): void
     {
         $subscriptions = $this->resolver->resolve($event);
 
