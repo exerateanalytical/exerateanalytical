@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AccountabilityController;
+use App\Http\Controllers\Api\V1\AlertSubscriptionController;
 use App\Http\Controllers\Api\V1\CivicController;
 use App\Http\Controllers\Api\V1\CountryController;
 use App\Http\Controllers\Api\V1\DevelopmentController;
@@ -145,5 +146,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Alert acknowledgement
         Route::put('/executive/alerts/{id}/acknowledge', [ExecutiveAlertController::class, 'acknowledge'])->whereUuid('id')->name('executive.alerts.acknowledge');
+
+        // Alert Subscription management (SuperAdmin only)
+        Route::apiResource('alert-subscriptions', AlertSubscriptionController::class)
+            ->whereUuid('alert_subscription');
     });
 });

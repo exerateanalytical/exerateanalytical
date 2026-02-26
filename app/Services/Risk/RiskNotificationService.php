@@ -5,19 +5,14 @@ namespace App\Services\Risk;
 use App\Models\RiskAlertEvent;
 use App\Services\Risk\Notifications\NotificationChannelInterface;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class RiskNotificationService
 {
-    /** @var NotificationChannelInterface[] */
-    private readonly array $channels;
-
-    public function __construct()
-    {
-        $this->channels = collect(config('risk_notifications.channels', []))
-            ->map(fn (string $class) => app($class))
-            ->all();
-    }
+    public function __construct(
+        private readonly RiskSubscriptionResolver $resolver,
+    ) {}
 
     public function notify(RiskAlertEvent $event): void
     {
@@ -25,16 +20,35 @@ class RiskNotificationService
             return;
         }
 
+        DB::afterCommit(function () use ($event) {
+            $this->dispatch($event);
+        });
+    }
+
+    private function dispatch(RiskAlertEvent $event): void
+    {
+        $subscriptions = $this->resolver->resolve($event);
+
+        if ($subscriptions->isEmpty()) {
+            return;
+        }
+
         $payload = $this->buildPayload($event);
 
-        foreach ($this->channels as $channel) {
+        foreach ($subscriptions as $subscription) {
             try {
+                /** @var NotificationChannelInterface $channel */
+                $channel = app()->makeWith($subscription->channel, [
+                    'channelConfig' => $subscription->channel_config ?? [],
+                ]);
+
                 $channel->send($payload);
             } catch (\Throwable $e) {
                 Log::error('Risk notification channel failure', [
-                    'channel'  => get_class($channel),
-                    'event_id' => $event->id,
-                    'error'    => $e->getMessage(),
+                    'channel'         => $subscription->channel,
+                    'subscription_id' => $subscription->id,
+                    'event_id'        => $event->id,
+                    'error'           => $e->getMessage(),
                 ]);
             }
         }

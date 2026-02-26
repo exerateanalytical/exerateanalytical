@@ -7,11 +7,11 @@ use Illuminate\Support\Facades\Notification;
 
 class EmailChannel implements NotificationChannelInterface
 {
+    public function __construct(private readonly array $channelConfig = []) {}
+
     public function send(array $payload): void
     {
-        $recipients = array_filter(
-            config('risk_notifications.email.recipients', [])
-        );
+        $recipients = array_filter($this->channelConfig['recipients'] ?? []);
 
         if (empty($recipients)) {
             return;

@@ -6,11 +6,13 @@ use Illuminate\Support\Facades\Http;
 
 class WebhookChannel implements NotificationChannelInterface
 {
+    public function __construct(private readonly array $channelConfig = []) {}
+
     public function send(array $payload): void
     {
-        $url     = config('risk_notifications.webhook.url', '');
-        $timeout = (int) config('risk_notifications.webhook.timeout', 5);
-        $secret  = config('risk_notifications.webhook.secret', '');
+        $url     = $this->channelConfig['url'] ?? '';
+        $timeout = (int) ($this->channelConfig['timeout'] ?? 5);
+        $secret  = $this->channelConfig['secret'] ?? '';
 
         if (empty($url)) {
             return;
