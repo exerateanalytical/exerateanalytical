@@ -5,6 +5,7 @@ namespace App\Services\Risk;
 use App\Models\RiskAlert;
 use App\Models\RiskAlertEvent;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class RiskAlertPersistenceService
 {
@@ -90,6 +91,8 @@ class RiskAlertPersistenceService
 
                 $this->notificationService->notify($event);
             });
+
+        Cache::forget("risk:analytics:{$countryId}");
 
         return RiskAlert::where('country_id', $countryId)
             ->where('active', true)

@@ -17,7 +17,10 @@ class SendRiskNotificationJob implements ShouldQueue
 
     public array $backoff = [10, 30, 60, 120, 300];
 
-    public function __construct(public readonly string $eventId) {}
+    public function __construct(public readonly string $eventId)
+    {
+        $this->onQueue('risk-notifications');
+    }
 
     public function handle(RiskNotificationService $service): void
     {
@@ -28,5 +31,18 @@ class SendRiskNotificationJob implements ShouldQueue
         }
 
         $service->dispatchNow($event);
+    }
+
+    public function failed(\Throwable $e): void
+    {
+        $event = RiskAlertEvent::find($this->eventId);
+
+        if ($event === null) {
+            return;
+        }
+
+        $metadata = $event->metadata ?? [];
+        $metadata['notification_failed'] = true;
+        $event->update(['metadata' => $metadata]);
     }
 }

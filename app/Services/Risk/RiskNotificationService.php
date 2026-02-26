@@ -18,6 +18,14 @@ class RiskNotificationService
     public function notify(RiskAlertEvent $event): void
     {
         if ($this->isSuppressed($event)) {
+            Log::debug('Risk notification suppressed (retrigger within window)', [
+                'event_id'   => $event->id,
+                'alert_id'   => $event->risk_alert_id,
+                'country_id' => $event->country_id,
+                'event_type' => $event->event_type,
+                'severity'   => $event->severity,
+            ]);
+
             return;
         }
 
@@ -47,6 +55,11 @@ class RiskNotificationService
                     'channel'         => $subscription->channel,
                     'subscription_id' => $subscription->id,
                     'event_id'        => $event->id,
+                    'alert_id'        => $event->risk_alert_id,
+                    'country_id'      => $event->country_id,
+                    'event_type'      => $event->event_type,
+                    'severity'        => $event->severity,
+                    'exception'       => $e::class,
                     'error'           => $e->getMessage(),
                 ]);
             }

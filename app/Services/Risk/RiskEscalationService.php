@@ -5,6 +5,7 @@ namespace App\Services\Risk;
 use App\Models\RiskAlert;
 use App\Models\RiskAlertEvent;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class RiskEscalationService
 {
@@ -54,6 +55,8 @@ class RiskEscalationService
                     ]);
 
                     $this->notificationService->notify($event);
+
+                    Cache::forget("risk:analytics:{$alert->country_id}");
 
                     $escalated++;
                 }
