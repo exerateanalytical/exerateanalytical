@@ -8,6 +8,10 @@ use Illuminate\Support\Carbon;
 
 class RiskAlertPersistenceService
 {
+    public function __construct(
+        private readonly RiskNotificationService $notificationService,
+    ) {}
+
     /**
      * Sync evaluated alerts against the persistence layer for a country.
      *
@@ -40,13 +44,15 @@ class RiskAlertPersistenceService
                     'last_triggered_at' => $now,
                 ]);
 
-                RiskAlertEvent::create([
+                $event = RiskAlertEvent::create([
                     'risk_alert_id' => $record->id,
                     'country_id'    => $countryId,
                     'type'          => $alert['type'],
                     'event_type'    => $eventType,
                     'severity'      => $alert['severity'],
                 ]);
+
+                $this->notificationService->notify($event);
             } else {
                 $record = RiskAlert::create([
                     'country_id'         => $countryId,
@@ -57,13 +63,15 @@ class RiskAlertPersistenceService
                     'last_triggered_at'  => $now,
                 ]);
 
-                RiskAlertEvent::create([
+                $event = RiskAlertEvent::create([
                     'risk_alert_id' => $record->id,
                     'country_id'    => $countryId,
                     'type'          => $alert['type'],
                     'event_type'    => 'triggered',
                     'severity'      => $alert['severity'],
                 ]);
+
+                $this->notificationService->notify($event);
             }
         }
 
@@ -72,13 +80,15 @@ class RiskAlertPersistenceService
             ->each(function (RiskAlert $alert) {
                 $alert->update(['active' => false]);
 
-                RiskAlertEvent::create([
+                $event = RiskAlertEvent::create([
                     'risk_alert_id' => $alert->id,
                     'country_id'    => $alert->country_id,
                     'type'          => $alert->type,
                     'event_type'    => 'resolved',
                     'severity'      => $alert->severity,
                 ]);
+
+                $this->notificationService->notify($event);
             });
 
         return RiskAlert::where('country_id', $countryId)
