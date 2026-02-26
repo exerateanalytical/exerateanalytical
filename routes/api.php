@@ -140,5 +140,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/exposure-matrix', [ExposureMatrixController::class, 'store'])->name('exposure-matrix.store');
         Route::put('/exposure-matrix/{id}/activate', [ExposureMatrixController::class, 'activate'])->whereUuid('id')->name('exposure-matrix.activate');
         Route::get('/exposure-matrix/active', [ExposureMatrixController::class, 'active'])->name('exposure-matrix.active');
+
+        // Alert acknowledgement
+        Route::put('/executive/alerts/{id}/acknowledge', [ExecutiveAlertController::class, 'acknowledge'])->whereUuid('id')->name('executive.alerts.acknowledge');
     });
 });
