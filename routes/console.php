@@ -18,3 +18,7 @@ Schedule::job(new MonthlyMethodologyConsistencyAuditJob)->monthly();
 
 // Risk alert escalation
 Schedule::command('risk:escalate')->everyFiveMinutes();
+
+// Federation snapshot pipeline
+Schedule::command('risk:publish-regional-snapshot')->everyFiveMinutes();
+Schedule::command('risk:compute-federation-global')->everyFiveMinutes();

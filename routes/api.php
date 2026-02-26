@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\ExecutiveNationalController;
 use App\Http\Controllers\Api\V1\ExecutiveNetworkRankingController;
 use App\Http\Controllers\Api\V1\ExecutiveRiskDashboardController;
 use App\Http\Controllers\Api\V1\ExposureMatrixController;
+use App\Http\Controllers\Api\V1\FederationController;
 use App\Http\Controllers\Api\V1\FiscalController;
 use App\Http\Controllers\Api\V1\GovernanceController;
 use App\Http\Controllers\Api\V1\InstitutionController;
@@ -88,6 +89,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/executive/alerts/{country}', [ExecutiveAlertController::class, 'show'])->name('executive.alerts');
         Route::get('/executive/alerts/{country}/metrics', [ExecutiveAlertAnalyticsController::class, 'metrics'])->name('executive.alerts.metrics');
         Route::get('/executive/governance/{country}', [ExecutiveGovernanceMetricsController::class, 'metrics'])->name('executive.governance.metrics');
+
+        // Federation aggregated snapshots
+        Route::get('/federation/global', [FederationController::class, 'global'])->name('federation.global');
+        Route::get('/federation/regions', [FederationController::class, 'regions'])->name('federation.regions');
 
         // Executive Risk Dashboard
         Route::prefix('dashboard')->name('dashboard.')->group(function () {
