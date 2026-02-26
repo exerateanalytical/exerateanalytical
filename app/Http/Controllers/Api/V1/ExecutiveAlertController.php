@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\RiskAlert;
+use App\Models\RiskAlertEvent;
 use App\Services\Risk\RiskAlertPersistenceService;
 use App\Services\Risk\RiskAlertService;
 use App\Services\Risk\RiskIntelligenceService;
@@ -45,6 +46,14 @@ class ExecutiveAlertController extends Controller
         $alert->update([
             'acknowledged_at' => Carbon::now(),
             'acknowledged_by' => $request->input('acknowledged_by'),
+        ]);
+
+        RiskAlertEvent::create([
+            'risk_alert_id' => $alert->id,
+            'country_id'    => $alert->country_id,
+            'type'          => $alert->type,
+            'event_type'    => 'acknowledged',
+            'severity'      => $alert->severity,
         ]);
 
         return response()->json([

@@ -3,6 +3,7 @@
 namespace App\Services\Risk;
 
 use App\Models\RiskAlert;
+use App\Models\RiskAlertEvent;
 use Illuminate\Support\Carbon;
 
 class RiskAlertPersistenceService
@@ -10,9 +11,10 @@ class RiskAlertPersistenceService
     /**
      * Sync evaluated alerts against the persistence layer for a country.
      *
-     * - Existing alert with same type  → set active = true, update last_triggered_at
-     * - No existing alert for type     → create new record
-     * - Existing alert not in evaluated set → set active = false
+     * - New alert                           → create alert + "triggered" event
+     * - Existing alert, was inactive        → reactivate + "triggered" event
+     * - Existing alert, already active      → update timestamps + "retriggered" event
+     * - Existing alert not in evaluated set → deactivate + "resolved" event
      *
      * Returns all currently active alerts for the country.
      *
@@ -29,13 +31,24 @@ class RiskAlertPersistenceService
 
         foreach ($evaluatedAlerts as $alert) {
             if ($existing->has($alert['type'])) {
-                $existing->get($alert['type'])->update([
+                $record    = $existing->get($alert['type']);
+                $eventType = $record->active ? 'retriggered' : 'triggered';
+
+                $record->update([
                     'active'            => true,
                     'severity'          => $alert['severity'],
                     'last_triggered_at' => $now,
                 ]);
+
+                RiskAlertEvent::create([
+                    'risk_alert_id' => $record->id,
+                    'country_id'    => $countryId,
+                    'type'          => $alert['type'],
+                    'event_type'    => $eventType,
+                    'severity'      => $alert['severity'],
+                ]);
             } else {
-                RiskAlert::create([
+                $record = RiskAlert::create([
                     'country_id'         => $countryId,
                     'type'               => $alert['type'],
                     'severity'           => $alert['severity'],
@@ -43,12 +56,30 @@ class RiskAlertPersistenceService
                     'first_triggered_at' => $now,
                     'last_triggered_at'  => $now,
                 ]);
+
+                RiskAlertEvent::create([
+                    'risk_alert_id' => $record->id,
+                    'country_id'    => $countryId,
+                    'type'          => $alert['type'],
+                    'event_type'    => 'triggered',
+                    'severity'      => $alert['severity'],
+                ]);
             }
         }
 
         $existing
             ->reject(fn (RiskAlert $alert) => in_array($alert->type, $evaluatedTypes, true))
-            ->each(fn (RiskAlert $alert) => $alert->update(['active' => false]));
+            ->each(function (RiskAlert $alert) {
+                $alert->update(['active' => false]);
+
+                RiskAlertEvent::create([
+                    'risk_alert_id' => $alert->id,
+                    'country_id'    => $alert->country_id,
+                    'type'          => $alert->type,
+                    'event_type'    => 'resolved',
+                    'severity'      => $alert->severity,
+                ]);
+            });
 
         return RiskAlert::where('country_id', $countryId)
             ->where('active', true)
