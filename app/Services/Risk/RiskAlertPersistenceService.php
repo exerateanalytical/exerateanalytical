@@ -2,11 +2,14 @@
 
 namespace App\Services\Risk;
 
+use App\Events\RiskAlertStreamed;
 use App\Models\Country;
+use App\Models\FederationRegion;
 use App\Models\RiskAlert;
 use App\Models\RiskAlertEvent;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class RiskAlertPersistenceService
 {
@@ -33,8 +36,11 @@ class RiskAlertPersistenceService
         $now            = Carbon::now();
         $evaluatedTypes = collect($evaluatedAlerts)->pluck('type')->all();
 
-        // Resolve federation region for the country (single value query)
-        $regionId = Country::where('id', $countryId)->value('region_id');
+        // Resolve federation region for the country (two lightweight value queries)
+        $regionId   = Country::where('id', $countryId)->value('region_id');
+        $regionCode = $regionId
+            ? FederationRegion::where('id', $regionId)->value('code')
+            : null;
 
         $existing = RiskAlert::where('country_id', $countryId)->get()->keyBy('type');
 
@@ -60,6 +66,7 @@ class RiskAlertPersistenceService
                 ]);
 
                 $this->notificationService->notify($event);
+                DB::afterCommit(fn () => broadcast(new RiskAlertStreamed($event, $regionCode)));
             } else {
                 $record = RiskAlert::create([
                     'country_id'         => $countryId,
@@ -81,12 +88,13 @@ class RiskAlertPersistenceService
                 ]);
 
                 $this->notificationService->notify($event);
+                DB::afterCommit(fn () => broadcast(new RiskAlertStreamed($event, $regionCode)));
             }
         }
 
         $existing
             ->reject(fn (RiskAlert $alert) => in_array($alert->type, $evaluatedTypes, true))
-            ->each(function (RiskAlert $alert) use ($regionId) {
+            ->each(function (RiskAlert $alert) use ($regionId, $regionCode) {
                 $alert->update(['active' => false]);
 
                 $event = RiskAlertEvent::create([
@@ -99,6 +107,7 @@ class RiskAlertPersistenceService
                 ]);
 
                 $this->notificationService->notify($event);
+                DB::afterCommit(fn () => broadcast(new RiskAlertStreamed($event, $regionCode)));
             });
 
         Cache::forget('risk:analytics:' . ($regionId ?? 'global') . ":{$countryId}");

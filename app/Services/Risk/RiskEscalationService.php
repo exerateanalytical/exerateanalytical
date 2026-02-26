@@ -2,10 +2,13 @@
 
 namespace App\Services\Risk;
 
+use App\Events\RiskAlertStreamed;
+use App\Models\FederationRegion;
 use App\Models\RiskAlert;
 use App\Models\RiskAlertEvent;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class RiskEscalationService
 {
@@ -58,6 +61,14 @@ class RiskEscalationService
                     $this->notificationService->notify($event);
 
                     Cache::forget('risk:analytics:' . ($alert->region_id ?? 'global') . ":{$alert->country_id}");
+
+                    $regionId = $alert->region_id;
+                    DB::afterCommit(function () use ($event, $regionId) {
+                        $regionCode = $regionId
+                            ? FederationRegion::where('id', $regionId)->value('code')
+                            : null;
+                        broadcast(new RiskAlertStreamed($event, $regionCode));
+                    });
 
                     $escalated++;
                 }
