@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\PetitionController;
 use App\Http\Controllers\Api\V1\PolicyProposalController;
 use App\Http\Controllers\Api\V1\PollController;
 use App\Http\Controllers\Api\V1\ReactionController;
+use App\Http\Controllers\Api\V1\TrustController;
 use App\Http\Controllers\Api\V1\CountryController;
 use App\Http\Controllers\Api\V1\DevelopmentController;
 use App\Http\Controllers\Api\V1\ExecutiveAlertAnalyticsController;
@@ -182,6 +183,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/petitions',  [PetitionController::class,        'index'])->name('petitions.index');
         Route::get('/policies',   [PolicyProposalController::class,  'index'])->name('policies.index');
         Route::get('/feed',       [CivicFeedController::class,       'index'])->name('civic.feed');
+        Route::get('/users/{user}/trust', [TrustController::class, 'show'])->name('users.trust')->whereUuid('user');
 
         // Authenticated writes
         Route::middleware(['auth:sanctum'])->group(function () {

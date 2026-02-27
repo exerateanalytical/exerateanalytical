@@ -6,12 +6,14 @@ use App\Models\Country;
 use App\Models\FiscalRiskSignal;
 use App\Models\Institution;
 use App\Models\Region;
+use App\Models\ReputationEvent;
 use App\Models\RiskSignal;
 use App\Models\ServiceAccessRecord;
 use App\Observers\CountryObserver;
 use App\Observers\FiscalRiskSignalObserver;
 use App\Observers\InstitutionObserver;
 use App\Observers\RegionObserver;
+use App\Observers\ReputationEventObserver;
 use App\Observers\RiskSignalObserver;
 use App\Policies\CountryPolicy;
 use App\Policies\DevelopmentPolicy;
@@ -55,6 +57,7 @@ class AppServiceProvider extends ServiceProvider
         FiscalRiskSignal::observe(FiscalRiskSignalObserver::class);
         Institution::observe(InstitutionObserver::class);
         Region::observe(RegionObserver::class);
+        ReputationEvent::observe(ReputationEventObserver::class);
         RiskSignal::observe(RiskSignalObserver::class);
 
         // Register policies
