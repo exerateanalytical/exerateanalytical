@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Poll extends Model
 {
@@ -49,5 +50,15 @@ class Poll extends Model
     public function votes(): HasMany
     {
         return $this->hasMany(PollVote::class);
+    }
+
+    public function reactions(): MorphMany
+    {
+        return $this->morphMany(Reaction::class, 'reactable');
+    }
+
+    public function moderationLogs(): MorphMany
+    {
+        return $this->morphMany(ModerationLog::class, 'subject');
     }
 }

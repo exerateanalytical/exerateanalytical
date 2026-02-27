@@ -10,14 +10,18 @@ class PetitionResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'country_id' => $this->country_id,
-            'title' => $this->title,
-            'description' => $this->description,
-            'category' => $this->category,
-            'status' => $this->status,
-            'signature_count' => $this->signatures()->count(),
-            'created_at' => $this->created_at?->toIso8601String(),
+            'id'              => $this->id,
+            'creator_id'      => $this->creator_id,
+            'region_id'       => $this->region_id,
+            'title'           => $this->title,
+            'summary'         => $this->summary,
+            'body'            => $this->body,
+            'signature_goal'  => $this->signature_goal,
+            'signature_count' => $this->signature_count,
+            'status'          => $this->status,
+            'deadline'        => $this->deadline?->toIso8601String(),
+            'created_at'      => $this->created_at?->toIso8601String(),
+            'updated_at'      => $this->updated_at?->toIso8601String(),
         ];
     }
 }

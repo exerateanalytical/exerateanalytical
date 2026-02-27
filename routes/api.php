@@ -3,6 +3,11 @@
 use App\Http\Controllers\Api\V1\AccountabilityController;
 use App\Http\Controllers\Api\V1\AlertSubscriptionController;
 use App\Http\Controllers\Api\V1\CivicController;
+use App\Http\Controllers\Api\V1\CivicFeedController;
+use App\Http\Controllers\Api\V1\PetitionController;
+use App\Http\Controllers\Api\V1\PolicyProposalController;
+use App\Http\Controllers\Api\V1\PollController;
+use App\Http\Controllers\Api\V1\ReactionController;
 use App\Http\Controllers\Api\V1\CountryController;
 use App\Http\Controllers\Api\V1\DevelopmentController;
 use App\Http\Controllers\Api\V1\ExecutiveAlertAnalyticsController;
@@ -168,4 +173,32 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/risk/contagion', [RiskContagionController::class, 'execute'])
                 ->name('risk.contagion');
         });
+
+    // ─── Civic Participation Routes ─────────────────────────────────────────
+    Route::middleware(['throttle:60,1'])->group(function () {
+
+        // Public reads
+        Route::get('/polls',      [PollController::class,            'index'])->name('polls.index');
+        Route::get('/petitions',  [PetitionController::class,        'index'])->name('petitions.index');
+        Route::get('/policies',   [PolicyProposalController::class,  'index'])->name('policies.index');
+        Route::get('/feed',       [CivicFeedController::class,       'index'])->name('civic.feed');
+
+        // Authenticated writes
+        Route::middleware(['auth:sanctum'])->group(function () {
+            // Polls
+            Route::post('/polls',              [PollController::class, 'store'])->name('polls.store');
+            Route::post('/polls/{poll}/vote',  [PollController::class, 'vote'])->name('polls.vote')->whereUuid('poll');
+
+            // Petitions
+            Route::post('/petitions',                        [PetitionController::class, 'store'])->name('petitions.store');
+            Route::post('/petitions/{petition}/sign',        [PetitionController::class, 'sign'])->name('petitions.sign')->whereUuid('petition');
+
+            // Policy Proposals
+            Route::post('/policies',                         [PolicyProposalController::class, 'store'])->name('policies.store');
+            Route::patch('/policies/{policy}/stage',         [PolicyProposalController::class, 'changeStage'])->name('policies.stage')->whereUuid('policy');
+
+            // Reactions
+            Route::post('/reactions',                        [ReactionController::class, 'store'])->name('reactions.store');
+        });
+    });
 });
