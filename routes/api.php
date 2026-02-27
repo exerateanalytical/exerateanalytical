@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\DevelopmentController;
 use App\Http\Controllers\Api\V1\ExecutiveAlertAnalyticsController;
 use App\Http\Controllers\Api\V1\ExecutiveAlertController;
 use App\Http\Controllers\Api\V1\ExecutiveBriefController;
+use App\Http\Controllers\Api\V1\ExecutiveControlTowerController;
 use App\Http\Controllers\Api\V1\ExecutiveGovernanceMetricsController;
 use App\Http\Controllers\Api\V1\ExecutiveNationalController;
 use App\Http\Controllers\Api\V1\ExecutiveNetworkRankingController;
@@ -96,6 +97,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/executive/alerts/{country}', [ExecutiveAlertController::class, 'show'])->name('executive.alerts');
         Route::get('/executive/alerts/{country}/metrics', [ExecutiveAlertAnalyticsController::class, 'metrics'])->name('executive.alerts.metrics');
         Route::get('/executive/governance/{country}', [ExecutiveGovernanceMetricsController::class, 'metrics'])->name('executive.governance.metrics');
+        Route::get('/executive/control-tower', [ExecutiveControlTowerController::class, 'show'])->name('executive.control-tower');
 
         // Federation aggregated snapshots
         Route::get('/federation/global', [FederationController::class, 'global'])->name('federation.global');
