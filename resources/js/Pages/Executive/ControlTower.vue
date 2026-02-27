@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import AnalyticsLayout from '@/Layouts/AnalyticsLayout.vue';
+import ActionModal from '@/Components/Executive/ActionModal.vue';
 import axios from 'axios';
 
 const props = defineProps({
@@ -23,6 +24,33 @@ const representationIndex = ref(props.representation_index);
 const generatedAt         = ref(props.generated_at);
 const refreshing          = ref(false);
 const refreshError        = ref(null);
+
+// ── Quick Actions / Modal ─────────────────────────────────────────────────────
+const showModal        = ref(false);
+const activeActionType = ref('');
+
+function openModal(type) {
+    activeActionType.value = type;
+    showModal.value        = true;
+}
+
+function onActionSuccess() {
+    showModal.value = false;
+    showToast('Action executed successfully.');
+    refresh();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+const toastVisible = ref(false);
+const toastMessage = ref('');
+let   toastTimer   = null;
+
+function showToast(msg) {
+    toastMessage.value = msg;
+    toastVisible.value = true;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastVisible.value = false; }, 3500);
+}
 
 async function refresh() {
     refreshing.value  = true;
@@ -310,8 +338,64 @@ const pct = (v, decimals = 1) =>
                     </div>
                 </section>
 
-                <!-- Right column: E. Contagion + F. Representation -->
+                <!-- Right column: Quick Actions + E. Contagion + F. Representation -->
                 <section class="space-y-6">
+
+                    <!-- QUICK ACTIONS panel ──────────────────────────────── -->
+                    <div>
+                        <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Governance Actions</h2>
+                        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 grid grid-cols-2 gap-3">
+
+                            <!-- Simulate Contagion (red — risk intervention) -->
+                            <button
+                                @click="openModal('simulate_contagion')"
+                                class="flex flex-col items-center gap-2 px-3 py-4 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300 transition text-center group"
+                            >
+                                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                                        d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                <span class="text-xs font-semibold leading-tight">Simulate Contagion</span>
+                            </button>
+
+                            <!-- Launch Civic Poll (emerald — stabilising) -->
+                            <button
+                                @click="openModal('launch_poll')"
+                                class="flex flex-col items-center gap-2 px-3 py-4 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 transition text-center group"
+                            >
+                                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                                </svg>
+                                <span class="text-xs font-semibold leading-tight">Launch Civic Poll</span>
+                            </button>
+
+                            <!-- Open Policy Consultation (amber — consultation) -->
+                            <button
+                                @click="openModal('open_consultation')"
+                                class="flex flex-col items-center gap-2 px-3 py-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-300 transition text-center group"
+                            >
+                                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                                        d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3-3-3z"/>
+                                </svg>
+                                <span class="text-xs font-semibold leading-tight">Open Consultation</span>
+                            </button>
+
+                            <!-- Flag Region (amber — warning) -->
+                            <button
+                                @click="openModal('flag_region')"
+                                class="flex flex-col items-center gap-2 px-3 py-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-300 transition text-center group"
+                            >
+                                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                                        d="M3 21v-4m0 0V5a2 2 0 012-2h6.5L13 5h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                                </svg>
+                                <span class="text-xs font-semibold leading-tight">Flag Region</span>
+                            </button>
+
+                        </div>
+                    </div>
 
                     <!-- E. Contagion Forecast -->
                     <div>
@@ -497,5 +581,45 @@ const pct = (v, decimals = 1) =>
             </div>
 
         </div>
+        <!-- ── Action Modal ─────────────────────────────────────────────── -->
+        <Transition
+            enter-from-class="opacity-0 scale-95"
+            enter-active-class="transition duration-150 ease-out"
+            enter-to-class="opacity-100 scale-100"
+            leave-from-class="opacity-100 scale-100"
+            leave-active-class="transition duration-100 ease-in"
+            leave-to-class="opacity-0 scale-95"
+        >
+            <ActionModal
+                v-if="showModal"
+                :action-type="activeActionType"
+                :regions="regions"
+                @close="showModal = false"
+                @success="onActionSuccess"
+            />
+        </Transition>
+
+        <!-- ── Toast ───────────────────────────────────────────────────── -->
+        <Teleport to="body">
+            <Transition
+                enter-from-class="opacity-0 translate-y-2"
+                enter-active-class="transition duration-200 ease-out"
+                enter-to-class="opacity-100 translate-y-0"
+                leave-from-class="opacity-100 translate-y-0"
+                leave-active-class="transition duration-150 ease-in"
+                leave-to-class="opacity-0 translate-y-2"
+            >
+                <div
+                    v-if="toastVisible"
+                    class="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 bg-gray-900 text-white text-sm font-semibold rounded-xl shadow-xl"
+                >
+                    <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    {{ toastMessage }}
+                </div>
+            </Transition>
+        </Teleport>
+
     </AnalyticsLayout>
 </template>
