@@ -10,12 +10,13 @@ const page = usePage();
 const mobileOpen = ref(false);
 
 const navItems = [
-    { label: 'Dashboard',    href: '/dashboard',  auth: true },
-    { label: 'Countries',    href: '/countries' },
-    { label: 'Risk',         href: '/risk' },
-    { label: 'Executive',    href: '/executive' },
-    { label: 'Federation',   href: '/federation' },
-    { label: 'Civic',        href: '/civic/feed' },
+    { label: 'Dashboard',     href: '/dashboard',                 auth: true },
+    { label: 'Countries',     href: '/countries' },
+    { label: 'Risk',          href: '/risk' },
+    { label: 'Executive',     href: '/executive' },
+    { label: 'Control Tower', href: '/executive/control-tower' },
+    { label: 'Federation',    href: '/federation' },
+    { label: 'Civic',         href: '/civic/feed' },
 ];
 </script>
 

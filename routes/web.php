@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\AdminWebController;
 use App\Http\Controllers\Web\CivicFeedWebController;
 use App\Http\Controllers\Web\CountriesWebController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\ExecutiveControlTowerWebController;
 use App\Http\Controllers\Web\ExecutiveDashboardWebController;
 use App\Http\Controllers\Web\FederationWebController;
 use App\Http\Controllers\Web\PetitionWebController;
@@ -101,8 +102,9 @@ Route::prefix('risk')->name('risk.')->group(function () {
 
 // ── Executive Dashboard (public) ─────────────────────────────────────────────
 Route::prefix('executive')->name('executive.')->group(function () {
-    Route::get('/',          [ExecutiveDashboardWebController::class, 'index'])->name('index');
-    Route::get('/{country}', [ExecutiveDashboardWebController::class, 'show'])->whereUuid('country')->name('show');
+    Route::get('/',               [ExecutiveDashboardWebController::class, 'index'])->name('index');
+    Route::get('/control-tower',  [ExecutiveControlTowerWebController::class, 'index'])->name('control-tower');
+    Route::get('/{country}',      [ExecutiveDashboardWebController::class, 'show'])->whereUuid('country')->name('show');
 });
 
 // ── Federation Overview (public) ─────────────────────────────────────────────
