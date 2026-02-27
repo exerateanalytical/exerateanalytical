@@ -18,6 +18,13 @@ const navLinks = [
     { label: 'Petitions',  routeName: 'civic.petitions.index' },
     { label: 'Policies',   routeName: 'civic.policies.index' },
 ];
+
+const platformLinks = [
+    { label: 'Countries', href: '/countries' },
+    { label: 'Risk',      href: '/risk' },
+    { label: 'Executive', href: '/executive' },
+    { label: 'Federation',href: '/federation' },
+];
 </script>
 
 <template>
@@ -84,9 +91,15 @@ const navLinks = [
                                         </button>
                                     </template>
                                     <template #content>
-                                        <DropdownLink :href="route('dashboard')">Dashboard</DropdownLink>
+                                                        <DropdownLink :href="route('dashboard')">Dashboard</DropdownLink>
                                         <DropdownLink :href="route('profile.show')">Profile</DropdownLink>
                                         <DropdownLink :href="route('trust.profile', $page.props.auth.user.id)">My Trust Profile</DropdownLink>
+                                        <div class="border-t border-gray-100 my-1" />
+                                        <div class="px-4 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wider">Analytics</div>
+                                        <DropdownLink href="/countries">Countries</DropdownLink>
+                                        <DropdownLink href="/risk">Risk Dashboard</DropdownLink>
+                                        <DropdownLink href="/executive">Executive</DropdownLink>
+                                        <DropdownLink href="/federation">Federation</DropdownLink>
                                         <div class="border-t border-gray-100" />
                                         <form @submit.prevent="logout">
                                             <DropdownLink as="button">Log Out</DropdownLink>
