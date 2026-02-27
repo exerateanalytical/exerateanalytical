@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\ExecutiveBriefController;
 use App\Http\Controllers\Api\V1\ExecutiveControlTowerController;
 use App\Http\Controllers\Api\V1\ExecutiveGovernanceMetricsController;
 use App\Http\Controllers\Api\V1\GovernanceActionController;
+use App\Http\Controllers\Api\V1\GovernanceRecommendationController;
 use App\Http\Controllers\Api\V1\ExecutiveNationalController;
 use App\Http\Controllers\Api\V1\ExecutiveNetworkRankingController;
 use App\Http\Controllers\Api\V1\ExecutiveRiskDashboardController;
@@ -99,6 +100,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/executive/alerts/{country}/metrics', [ExecutiveAlertAnalyticsController::class, 'metrics'])->name('executive.alerts.metrics');
         Route::get('/executive/governance/{country}', [ExecutiveGovernanceMetricsController::class, 'metrics'])->name('executive.governance.metrics');
         Route::get('/executive/control-tower', [ExecutiveControlTowerController::class, 'show'])->name('executive.control-tower');
+        Route::get('/executive/recommendations', [GovernanceRecommendationController::class, 'index'])->name('executive.recommendations');
 
         // Federation aggregated snapshots
         Route::get('/federation/global', [FederationController::class, 'global'])->name('federation.global');
@@ -163,6 +165,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
         // Alert acknowledgement
         Route::put('/executive/alerts/{id}/acknowledge', [ExecutiveAlertController::class, 'acknowledge'])->whereUuid('id')->name('executive.alerts.acknowledge');
+
+        // Governance Advisor — accept / dismiss recommendations
+        Route::post('/executive/recommendations/{recommendation}/accept', [GovernanceRecommendationController::class, 'accept'])
+            ->whereUuid('recommendation')
+            ->name('executive.recommendations.accept');
+        Route::post('/executive/recommendations/{recommendation}/dismiss', [GovernanceRecommendationController::class, 'dismiss'])
+            ->whereUuid('recommendation')
+            ->name('executive.recommendations.dismiss');
 
         // Alert Subscription management (SuperAdmin only)
         Route::apiResource('alert-subscriptions', AlertSubscriptionController::class)

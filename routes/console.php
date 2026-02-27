@@ -22,3 +22,6 @@ Schedule::command('risk:escalate')->everyFiveMinutes();
 // Federation snapshot pipeline
 Schedule::command('risk:publish-regional-snapshot')->everyFiveMinutes();
 Schedule::command('risk:compute-federation-global')->everyFiveMinutes();
+
+// AI Governance Advisor — refresh recommendations every 10 minutes
+Schedule::command('governance:refresh-recommendations')->everyTenMinutes();

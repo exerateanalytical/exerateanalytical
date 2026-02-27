@@ -11,6 +11,7 @@ const props = defineProps({
     civic_momentum:       { type: Object, default: null },
     contagion_forecast:   { type: Object, default: null },
     representation_index: { type: Array,  default: () => [] },
+    recommendations:      { type: Array,  default: () => [] },
     generated_at:         { type: String, default: null },
 });
 
@@ -21,6 +22,7 @@ const policyRadar         = ref(props.policy_radar);
 const civicMomentum       = ref(props.civic_momentum);
 const contagionForecast   = ref(props.contagion_forecast);
 const representationIndex = ref(props.representation_index);
+const recommendations     = ref(props.recommendations);
 const generatedAt         = ref(props.generated_at);
 const refreshing          = ref(false);
 const refreshError        = ref(null);
@@ -53,24 +55,71 @@ function showToast(msg) {
 }
 
 async function refresh() {
-    refreshing.value  = true;
+    refreshing.value   = true;
     refreshError.value = null;
     try {
-        const { data } = await axios.get('/api/v1/executive/control-tower');
-        const d = data.data ?? {};
+        const [ctRes, recRes] = await Promise.all([
+            axios.get('/api/v1/executive/control-tower'),
+            axios.get('/api/v1/executive/recommendations'),
+        ]);
+        const d = ctRes.data.data ?? {};
         hero.value                = d.hero                 ?? null;
         regions.value             = d.regions              ?? [];
         policyRadar.value         = d.policy_radar         ?? [];
         civicMomentum.value       = d.civic_momentum       ?? null;
         contagionForecast.value   = d.contagion_forecast   ?? null;
         representationIndex.value = d.representation_index ?? [];
-        generatedAt.value         = data.meta?.generated_at ?? null;
+        generatedAt.value         = ctRes.data.meta?.generated_at ?? null;
+        recommendations.value     = recRes.data.data ?? [];
     } catch {
         refreshError.value = 'Refresh failed. Data may be stale.';
     } finally {
         refreshing.value = false;
     }
 }
+
+// ── Governance Advisor ────────────────────────────────────────────────────────
+const recLoading = ref({});  // { [id]: 'accept' | 'dismiss' | null }
+
+async function acceptRec(rec) {
+    recLoading.value = { ...recLoading.value, [rec.id]: 'accept' };
+    try {
+        await axios.post(`/api/v1/executive/recommendations/${rec.id}/accept`);
+        recommendations.value = recommendations.value.filter(r => r.id !== rec.id);
+        showToast('Recommendation accepted — action proposal created.');
+    } catch (err) {
+        showToast(err.response?.data?.message ?? 'Accept failed. Please try again.');
+    } finally {
+        const next = { ...recLoading.value };
+        delete next[rec.id];
+        recLoading.value = next;
+    }
+}
+
+async function dismissRec(rec) {
+    recLoading.value = { ...recLoading.value, [rec.id]: 'dismiss' };
+    try {
+        await axios.post(`/api/v1/executive/recommendations/${rec.id}/dismiss`);
+        recommendations.value = recommendations.value.filter(r => r.id !== rec.id);
+    } catch (err) {
+        showToast(err.response?.data?.message ?? 'Dismiss failed. Please try again.');
+    } finally {
+        const next = { ...recLoading.value };
+        delete next[rec.id];
+        recLoading.value = next;
+    }
+}
+
+// ── Advisor display helpers ───────────────────────────────────────────────────
+const SEVERITY_META = {
+    critical: { label: 'Critical', cls: 'bg-red-100    text-red-700    border-red-200',    dot: 'bg-red-500'    },
+    high:     { label: 'High',     cls: 'bg-orange-100 text-orange-700 border-orange-200', dot: 'bg-orange-500' },
+    medium:   { label: 'Medium',   cls: 'bg-amber-100  text-amber-700  border-amber-200',  dot: 'bg-amber-400'  },
+    low:      { label: 'Low',      cls: 'bg-blue-100   text-blue-700   border-blue-200',   dot: 'bg-blue-400'   },
+};
+
+const sevMeta  = (s) => SEVERITY_META[s] ?? SEVERITY_META.low;
+const truncate = (str, max = 140) => str && str.length > max ? str.slice(0, max) + '…' : (str ?? '');
 
 // ── Display helpers ───────────────────────────────────────────────────────────
 const stabilityBorder = (val) => {
@@ -338,8 +387,82 @@ const pct = (v, decimals = 1) =>
                     </div>
                 </section>
 
-                <!-- Right column: Quick Actions + E. Contagion + F. Representation -->
+                <!-- Right column: AI Advisor + Quick Actions + E. Contagion + F. Representation -->
                 <section class="space-y-6">
+
+                    <!-- AI GOVERNANCE ADVISOR panel ─────────────────────── -->
+                    <div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">AI Governance Advisor</h2>
+                            <!-- sparkle icon -->
+                            <svg class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                                    d="M5 3l1.5 4.5L12 9l-5.5 1.5L5 15l-1.5-4.5L-2 9l6.5-1.5L5 3zm12 9l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3z"/>
+                            </svg>
+                        </div>
+
+                        <div v-if="recommendations.length" class="space-y-3">
+                            <div
+                                v-for="rec in recommendations"
+                                :key="rec.id"
+                                class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3"
+                            >
+                                <!-- Header row: severity badge + confidence -->
+                                <div class="flex items-center justify-between gap-2">
+                                    <span :class="[
+                                        'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border',
+                                        sevMeta(rec.severity).cls,
+                                    ]">
+                                        <span :class="['w-1.5 h-1.5 rounded-full shrink-0', sevMeta(rec.severity).dot]" />
+                                        {{ sevMeta(rec.severity).label }}
+                                    </span>
+                                    <span class="text-xs font-mono text-gray-400 shrink-0">
+                                        {{ rec.confidence_score?.toFixed(0) }}% confidence
+                                    </span>
+                                </div>
+
+                                <!-- Title -->
+                                <p class="text-sm font-semibold text-gray-900 leading-snug">
+                                    {{ rec.title }}
+                                </p>
+
+                                <!-- Rationale preview -->
+                                <p class="text-xs text-gray-500 leading-relaxed">
+                                    {{ truncate(rec.rationale) }}
+                                </p>
+
+                                <!-- Action buttons -->
+                                <div class="flex items-center gap-2 pt-1">
+                                    <button
+                                        @click="acceptRec(rec)"
+                                        :disabled="recLoading[rec.id]"
+                                        class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 rounded-lg transition"
+                                    >
+                                        <svg v-if="recLoading[rec.id] === 'accept'" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                        </svg>
+                                        {{ recLoading[rec.id] === 'accept' ? 'Submitting…' : 'Accept' }}
+                                    </button>
+                                    <button
+                                        @click="dismissRec(rec)"
+                                        :disabled="recLoading[rec.id]"
+                                        class="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50 border border-gray-200 hover:bg-gray-100 disabled:opacity-50 rounded-lg transition"
+                                    >
+                                        {{ recLoading[rec.id] === 'dismiss' ? '…' : 'Dismiss' }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-else class="bg-gray-50 border border-gray-100 rounded-xl px-4 py-5 flex items-center gap-3">
+                            <svg class="w-4 h-4 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <p class="text-xs text-gray-400">No active recommendations. All signals within safe thresholds.</p>
+                        </div>
+                    </div>
 
                     <!-- QUICK ACTIONS panel ──────────────────────────────── -->
                     <div>

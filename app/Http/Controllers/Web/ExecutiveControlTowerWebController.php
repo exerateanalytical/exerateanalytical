@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\GovernanceRecommendation;
 use App\Services\Executive\ControlTowerService;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,6 +21,12 @@ class ExecutiveControlTowerWebController extends Controller
     {
         $payload = $service->build();
 
+        // Seed active recommendations ordered critical → low.
+        $recommendations = GovernanceRecommendation::where('status', 'active')
+            ->orderByRaw(GovernanceRecommendation::severityWeight() . ' DESC')
+            ->orderByDesc('confidence_score')
+            ->get();
+
         return Inertia::render('Executive/ControlTower', [
             'hero'                 => $payload['hero'],
             'regions'              => $payload['regions'],
@@ -27,6 +34,7 @@ class ExecutiveControlTowerWebController extends Controller
             'civic_momentum'       => $payload['civic_momentum'],
             'contagion_forecast'   => $payload['contagion_forecast'],
             'representation_index' => $payload['representation_index'],
+            'recommendations'      => $recommendations,
             'generated_at'         => now()->toIso8601String(),
         ]);
     }
