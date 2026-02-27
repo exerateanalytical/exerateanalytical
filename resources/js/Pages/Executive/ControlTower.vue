@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import AnalyticsLayout from '@/Layouts/AnalyticsLayout.vue';
 import ActionModal from '@/Components/Executive/ActionModal.vue';
+import ScenarioModal from '@/Components/Executive/ScenarioModal.vue';
 import axios from 'axios';
 
 const props = defineProps({
@@ -79,7 +80,12 @@ async function refresh() {
 }
 
 // ── Governance Advisor ────────────────────────────────────────────────────────
-const recLoading = ref({});  // { [id]: 'accept' | 'dismiss' | null }
+const recLoading  = ref({});  // { [id]: 'accept' | 'dismiss' | null }
+const scenarioRec = ref(null); // recommendation whose scenarios to show
+
+function openScenario(rec) {
+    scenarioRec.value = rec;
+}
 
 async function acceptRec(rec) {
     recLoading.value = { ...recLoading.value, [rec.id]: 'accept' };
@@ -444,6 +450,20 @@ const pct = (v, decimals = 1) =>
                                         </svg>
                                         {{ recLoading[rec.id] === 'accept' ? 'Submitting…' : 'Accept' }}
                                     </button>
+
+                                    <!-- View Futures: opens scenario projection modal -->
+                                    <button
+                                        @click="openScenario(rec)"
+                                        class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 hover:bg-violet-100 rounded-lg transition"
+                                        title="View counterfactual projections"
+                                    >
+                                        <svg class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                        </svg>
+                                        Futures
+                                    </button>
+
                                     <button
                                         @click="dismissRec(rec)"
                                         :disabled="recLoading[rec.id]"
@@ -721,6 +741,13 @@ const pct = (v, decimals = 1) =>
                 @success="onActionSuccess"
             />
         </Transition>
+
+        <!-- ── Scenario Modal (View Futures) ───────────────────────────── -->
+        <ScenarioModal
+            v-if="scenarioRec"
+            :recommendation="scenarioRec"
+            @close="scenarioRec = null"
+        />
 
         <!-- ── Toast ───────────────────────────────────────────────────── -->
         <Teleport to="body">

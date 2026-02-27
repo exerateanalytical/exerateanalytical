@@ -101,6 +101,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/executive/governance/{country}', [ExecutiveGovernanceMetricsController::class, 'metrics'])->name('executive.governance.metrics');
         Route::get('/executive/control-tower', [ExecutiveControlTowerController::class, 'show'])->name('executive.control-tower');
         Route::get('/executive/recommendations', [GovernanceRecommendationController::class, 'index'])->name('executive.recommendations');
+        Route::get('/executive/recommendations/{recommendation}/scenarios', [GovernanceRecommendationController::class, 'scenarios'])
+            ->whereUuid('recommendation')
+            ->name('executive.recommendations.scenarios');
 
         // Federation aggregated snapshots
         Route::get('/federation/global', [FederationController::class, 'global'])->name('federation.global');

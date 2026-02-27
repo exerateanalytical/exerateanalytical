@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\GovernanceRecommendation;
+use App\Models\GovernanceScenario;
 use App\Services\Governance\GovernanceWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,6 +26,29 @@ class GovernanceRecommendationController extends Controller
             ->get();
 
         return response()->json(['data' => $recommendations]);
+    }
+
+    /**
+     * GET /api/v1/executive/recommendations/{recommendation}/scenarios
+     *
+     * Returns the three counterfactual scenarios (accept / delay / ignore) for
+     * the given recommendation, ordered best-outcome first. No authentication
+     * required — pure projection data, no state changes.
+     */
+    public function scenarios(GovernanceRecommendation $recommendation): JsonResponse
+    {
+        $scenarios = GovernanceScenario::where('recommendation_id', $recommendation->id)
+            ->orderByRaw(GovernanceScenario::typeOrder())
+            ->get();
+
+        return response()->json([
+            'data'           => $scenarios,
+            'recommendation' => [
+                'id'       => $recommendation->id,
+                'title'    => $recommendation->title,
+                'severity' => $recommendation->severity,
+            ],
+        ]);
     }
 
     /**
