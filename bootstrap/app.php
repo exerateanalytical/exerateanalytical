@@ -103,6 +103,9 @@ return Application::configure(basePath: dirname(__DIR__))
                     'code' => 403,
                 ], 403);
             }
+            return \Inertia\Inertia::render('Error', ['status' => 403])
+                ->toResponse($request)
+                ->setStatusCode(403);
         });
 
         $exceptions->render(function (AuthenticationException $e, Request $request) {
@@ -125,6 +128,9 @@ return Application::configure(basePath: dirname(__DIR__))
                     'code' => 404,
                 ], 404);
             }
+            return \Inertia\Inertia::render('Error', ['status' => 404])
+                ->toResponse($request)
+                ->setStatusCode(404);
         });
 
         $exceptions->render(function (\Throwable $e, Request $request) {
@@ -136,6 +142,12 @@ return Application::configure(basePath: dirname(__DIR__))
                     'errors' => [],
                     'code' => $status,
                 ], $status);
+            }
+            $status = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
+            if (in_array($status, [403, 404, 500, 503], true)) {
+                return \Inertia\Inertia::render('Error', ['status' => $status])
+                    ->toResponse($request)
+                    ->setStatusCode($status);
             }
         });
     })->create();

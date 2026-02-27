@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FederationRegion;
 use App\Models\Petition;
 use App\Models\PetitionSignature;
+use App\Models\Reaction;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -50,9 +51,25 @@ class PetitionWebController extends Controller
                 ->exists()
             : false;
 
+        $reactionCounts = Reaction::where('reactable_id', $petition->id)
+            ->where('reactable_type', Petition::class)
+            ->selectRaw('type, count(*) as total')
+            ->groupBy('type')
+            ->pluck('total', 'type')
+            ->toArray();
+
+        $userReaction = $request->user()
+            ? Reaction::where('reactable_id', $petition->id)
+                ->where('reactable_type', Petition::class)
+                ->where('user_id', $request->user()->id)
+                ->value('type')
+            : null;
+
         return Inertia::render('Civic/Petitions/Show', [
-            'petition'  => $petition,
-            'hasSigned' => $hasSigned,
+            'petition'       => $petition,
+            'hasSigned'      => $hasSigned,
+            'reactionCounts' => $reactionCounts,
+            'userReaction'   => $userReaction,
         ]);
     }
 }

@@ -3,11 +3,32 @@ import CivicLayout from '@/Layouts/CivicLayout.vue';
 import TierBadge from '@/Components/Civic/TierBadge.vue';
 import BadgeChip from '@/Components/Civic/BadgeChip.vue';
 import StatCard from '@/Components/Civic/StatCard.vue';
+import StatusPill from '@/Components/Civic/StatusPill.vue';
 
 defineProps({
     profile:       { type: Object, required: true },
     participation: { type: Object, required: true },
+    activity:      { type: Array,  default: () => [] },
 });
+
+const activityRoute = (item) => {
+    if (item.type === 'poll')     return route('civic.polls.show',     item.id);
+    if (item.type === 'petition') return route('civic.petitions.show', item.id);
+    if (item.type === 'policy')   return route('civic.policies.show',  item.id);
+    return '#';
+};
+
+const activityTypeLabel = { poll: 'Poll', petition: 'Petition', policy: 'Policy' };
+
+const activityTypeColor = {
+    poll:     'bg-blue-100 text-blue-700',
+    petition: 'bg-emerald-100 text-emerald-700',
+    policy:   'bg-violet-100 text-violet-700',
+};
+
+const formatDate = (iso) => iso
+    ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
 
 const tierOrder = ['Citizen', 'Contributor', 'Trusted', 'Steward', 'Institutional'];
 
@@ -75,6 +96,31 @@ const tierDescription = {
                     />
                 </div>
                 <p v-else class="text-sm text-gray-400">No badges awarded yet.</p>
+            </div>
+
+            <!-- Recent activity -->
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <h2 class="font-semibold text-gray-800 mb-4">Recent Activity</h2>
+                <div v-if="activity.length" class="divide-y divide-gray-100">
+                    <a
+                        v-for="item in activity"
+                        :key="`${item.type}-${item.id}`"
+                        :href="activityRoute(item)"
+                        class="flex items-center gap-3 py-3 hover:bg-gray-50 -mx-2 px-2 rounded-lg transition group"
+                    >
+                        <span :class="['text-xs font-semibold px-2 py-0.5 rounded-full shrink-0', activityTypeColor[item.type]]">
+                            {{ activityTypeLabel[item.type] }}
+                        </span>
+                        <span class="flex-1 text-sm text-gray-700 group-hover:text-indigo-700 transition truncate">
+                            {{ item.title }}
+                        </span>
+                        <span class="shrink-0 flex items-center gap-1.5">
+                            <StatusPill :status="item.status" />
+                            <span class="text-xs text-gray-400">{{ formatDate(item.created_at) }}</span>
+                        </span>
+                    </a>
+                </div>
+                <p v-else class="text-sm text-gray-400">No created content yet.</p>
             </div>
 
             <!-- Trust tier ladder -->

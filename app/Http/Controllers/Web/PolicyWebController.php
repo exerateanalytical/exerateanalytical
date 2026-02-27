@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\FederationRegion;
 use App\Models\PolicyProposal;
+use App\Models\Reaction;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -58,11 +59,27 @@ class PolicyWebController extends Controller
         $isCreator = $request->user()?->id === $policy->creator_id;
         $nextStage = self::STAGE_NEXT[$policy->stage] ?? null;
 
+        $reactionCounts = Reaction::where('reactable_id', $policy->id)
+            ->where('reactable_type', PolicyProposal::class)
+            ->selectRaw('type, count(*) as total')
+            ->groupBy('type')
+            ->pluck('total', 'type')
+            ->toArray();
+
+        $userReaction = $request->user()
+            ? Reaction::where('reactable_id', $policy->id)
+                ->where('reactable_type', PolicyProposal::class)
+                ->where('user_id', $request->user()->id)
+                ->value('type')
+            : null;
+
         return Inertia::render('Civic/Policy/Show', [
-            'policy'    => $policy,
-            'stages'    => self::STAGE_ORDER,
-            'nextStage' => $nextStage,
-            'isCreator' => $isCreator,
+            'policy'         => $policy,
+            'stages'         => self::STAGE_ORDER,
+            'nextStage'      => $nextStage,
+            'isCreator'      => $isCreator,
+            'reactionCounts' => $reactionCounts,
+            'userReaction'   => $userReaction,
         ]);
     }
 }

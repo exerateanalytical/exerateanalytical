@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FederationRegion;
 use App\Models\Poll;
 use App\Models\PollVote;
+use App\Models\Reaction;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -48,9 +49,25 @@ class PollWebController extends Controller
             ? PollVote::where('poll_id', $poll->id)->where('user_id', $request->user()->id)->first()
             : null;
 
+        $reactionCounts = Reaction::where('reactable_id', $poll->id)
+            ->where('reactable_type', Poll::class)
+            ->selectRaw('type, count(*) as total')
+            ->groupBy('type')
+            ->pluck('total', 'type')
+            ->toArray();
+
+        $userReaction = $request->user()
+            ? Reaction::where('reactable_id', $poll->id)
+                ->where('reactable_type', Poll::class)
+                ->where('user_id', $request->user()->id)
+                ->value('type')
+            : null;
+
         return Inertia::render('Civic/Polls/Show', [
-            'poll'     => $poll,
-            'userVote' => $userVote ? ['selected_options' => $userVote->selected_options] : null,
+            'poll'           => $poll,
+            'userVote'       => $userVote ? ['selected_options' => $userVote->selected_options] : null,
+            'reactionCounts' => $reactionCounts,
+            'userReaction'   => $userReaction,
         ]);
     }
 }

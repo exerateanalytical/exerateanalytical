@@ -5,10 +5,13 @@ import CivicLayout from '@/Layouts/CivicLayout.vue';
 import StatusPill from '@/Components/Civic/StatusPill.vue';
 import TierBadge from '@/Components/Civic/TierBadge.vue';
 import ProgressBar from '@/Components/Civic/ProgressBar.vue';
+import ReactionBar from '@/Components/Civic/ReactionBar.vue';
 
 const props = defineProps({
-    petition:  { type: Object,  required: true },
-    hasSigned: { type: Boolean, default: false },
+    petition:       { type: Object,  required: true },
+    hasSigned:      { type: Boolean, default: false },
+    reactionCounts: { type: Object,  default: () => ({}) },
+    userReaction:   { type: String,  default: null },
 });
 
 const signing  = ref(false);
@@ -91,6 +94,17 @@ const formatDate = (iso) => iso
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
                 <h2 class="font-semibold text-gray-800 mb-4">Full Text</h2>
                 <div class="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">{{ petition.body }}</div>
+            </div>
+
+            <!-- Reactions -->
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <h2 class="font-semibold text-gray-800 mb-4">Community Reactions</h2>
+                <ReactionBar
+                    reactable-type="petition"
+                    :reactable-id="petition.id"
+                    :counts="reactionCounts"
+                    :user-reaction="userReaction"
+                />
             </div>
 
         </div>

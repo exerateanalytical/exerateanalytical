@@ -4,12 +4,15 @@ import { router } from '@inertiajs/vue3';
 import CivicLayout from '@/Layouts/CivicLayout.vue';
 import StatusPill from '@/Components/Civic/StatusPill.vue';
 import TierBadge from '@/Components/Civic/TierBadge.vue';
+import ReactionBar from '@/Components/Civic/ReactionBar.vue';
 
 const props = defineProps({
-    policy:    { type: Object,  required: true },
-    stages:    { type: Array,   default: () => [] },
-    nextStage: { type: String,  default: null },
-    isCreator: { type: Boolean, default: false },
+    policy:         { type: Object,  required: true },
+    stages:         { type: Array,   default: () => [] },
+    nextStage:      { type: String,  default: null },
+    isCreator:      { type: Boolean, default: false },
+    reactionCounts: { type: Object,  default: () => ({}) },
+    userReaction:   { type: String,  default: null },
 });
 
 const advancing = ref(false);
@@ -119,6 +122,17 @@ const formatDate = (iso) => iso
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
                 <h2 class="font-semibold text-gray-800 mb-4">Proposal Text</h2>
                 <div class="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">{{ policy.full_text }}</div>
+            </div>
+
+            <!-- Reactions -->
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <h2 class="font-semibold text-gray-800 mb-4">Community Reactions</h2>
+                <ReactionBar
+                    reactable-type="policy"
+                    :reactable-id="policy.id"
+                    :counts="reactionCounts"
+                    :user-reaction="userReaction"
+                />
             </div>
 
         </div>
