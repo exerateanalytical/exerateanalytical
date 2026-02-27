@@ -179,6 +179,17 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
             Route::post('/governance/actions', [GovernanceActionController::class, 'store'])
                 ->name('governance.actions.store');
+
+            Route::post('/governance/actions/propose', [GovernanceActionController::class, 'propose'])
+                ->name('governance.actions.propose');
+
+            Route::patch('/governance/actions/{action}/approve', [GovernanceActionController::class, 'approve'])
+                ->whereUuid('action')
+                ->name('governance.actions.approve');
+
+            Route::patch('/governance/actions/{action}/reject', [GovernanceActionController::class, 'reject'])
+                ->whereUuid('action')
+                ->name('governance.actions.reject');
         });
 
     // ─── Civic Participation Routes ─────────────────────────────────────────

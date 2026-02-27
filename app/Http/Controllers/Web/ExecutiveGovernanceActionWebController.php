@@ -17,7 +17,9 @@ class ExecutiveGovernanceActionWebController extends Controller
      */
     public function index(): Response
     {
+        // Pending proposals surface first; within each group order by most-recent.
         $actions = GovernanceAction::with('actor:id,name')
+            ->orderByRaw("CASE WHEN status = 'proposed' THEN 0 ELSE 1 END ASC")
             ->latest('executed_at')
             ->paginate(20);
 

@@ -80,6 +80,18 @@ function impact(action) {
     }
 }
 
+// ── Status badge helpers ──────────────────────────────────────────────────────
+const STATUS_META = {
+    proposed: { label: 'Pending',  cls: 'bg-gray-100   text-gray-500   border-gray-200'   },
+    approved: { label: 'Approved', cls: 'bg-blue-100   text-blue-700   border-blue-200'   },
+    executed: { label: 'Executed', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+    rejected: { label: 'Rejected', cls: 'bg-red-100    text-red-700    border-red-200'    },
+    archived: { label: 'Archived', cls: 'bg-gray-100   text-gray-400   border-gray-200'   },
+};
+
+const statusLabel = (s) => STATUS_META[s]?.label ?? s ?? 'Executed';
+const statusClass = (s) => STATUS_META[s]?.cls   ?? STATUS_META.executed.cls;
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const shortId = (uuid) =>
     uuid && uuid.length > 8 ? uuid.slice(0, 8) + '…' : (uuid ?? '—');
@@ -149,6 +161,9 @@ const prettyJson = (val) => {
                                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                     Impact Indicator
                                 </th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">
+                                    Status
+                                </th>
                                 <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">
                                     Details
                                 </th>
@@ -212,6 +227,13 @@ const prettyJson = (val) => {
                                             {{ impact(action).sub }}
                                         </span>
                                     </template>
+                                </td>
+
+                                <!-- Status -->
+                                <td class="px-4 py-3">
+                                    <span :class="['inline-block text-xs font-semibold px-2.5 py-1 rounded-full border', statusClass(action.status)]">
+                                        {{ statusLabel(action.status) }}
+                                    </span>
                                 </td>
 
                                 <!-- Details Button -->
@@ -324,12 +346,29 @@ const prettyJson = (val) => {
                 <!-- Drawer body — scrollable -->
                 <div class="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
+                    <!-- Status -->
+                    <div>
+                        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Status</h3>
+                        <span :class="['inline-block text-xs font-semibold px-2.5 py-1 rounded-full border', statusClass(activeAction.status)]">
+                            {{ statusLabel(activeAction.status) }}
+                        </span>
+                        <p v-if="activeAction.notes" class="mt-2 text-xs text-gray-500 italic">
+                            {{ activeAction.notes }}
+                        </p>
+                    </div>
+
                     <!-- Executed at -->
                     <div>
                         <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                             Executed At
                         </h3>
                         <p class="text-sm font-mono text-gray-800">{{ activeAction.executed_at ?? '—' }}</p>
+                    </div>
+
+                    <!-- Approval metadata -->
+                    <div v-if="activeAction.approved_at">
+                        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Reviewed At</h3>
+                        <p class="text-sm font-mono text-gray-800">{{ fmt(activeAction.approved_at) }}</p>
                     </div>
 
                     <!-- Target -->

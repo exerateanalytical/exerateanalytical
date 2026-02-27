@@ -104,6 +104,11 @@ const removeOption = (idx) => {
     if (pollOptions.value.length > 2) pollOptions.value.splice(idx, 1);
 };
 
+// ── Execution mode ────────────────────────────────────────────────────────────
+// 'immediate' → POST /governance/actions (existing execute pipeline)
+// 'approval'  → POST /governance/actions/propose (pending approval workflow)
+const executionMode = ref('immediate');
+
 // ── Submission state ──────────────────────────────────────────────────────────
 const loading   = ref(false);
 const error     = ref(null);
@@ -152,12 +157,17 @@ async function submit() {
     if (!canSubmit.value) return;
     loading.value = true;
     error.value   = null;
+
+    const url = executionMode.value === 'approval'
+        ? '/api/v1/internal/governance/actions/propose'
+        : '/api/v1/internal/governance/actions';
+
     try {
-        await axios.post('/api/v1/internal/governance/actions', {
+        await axios.post(url, {
             action_type: props.actionType,
             payload:     buildPayload(),
         });
-        emit('success');
+        emit('success', { mode: executionMode.value });
     } catch (err) {
         const data = err.response?.data;
         if (data?.errors) {
@@ -212,6 +222,39 @@ onUnmounted(() => document.removeEventListener('keydown', onKey));
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
                     </button>
+                </div>
+
+                <!-- Execution mode toggle -->
+                <div class="px-6 pt-4 pb-0">
+                    <div class="flex items-center rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1 text-xs font-semibold">
+                        <button
+                            type="button"
+                            @click="executionMode = 'immediate'"
+                            :class="[
+                                'flex-1 py-1.5 rounded-lg transition',
+                                executionMode === 'immediate'
+                                    ? 'bg-white shadow-sm text-gray-800'
+                                    : 'text-gray-400 hover:text-gray-600',
+                            ]"
+                        >
+                            ⚡ Execute Immediately
+                        </button>
+                        <button
+                            type="button"
+                            @click="executionMode = 'approval'"
+                            :class="[
+                                'flex-1 py-1.5 rounded-lg transition',
+                                executionMode === 'approval'
+                                    ? 'bg-white shadow-sm text-gray-800'
+                                    : 'text-gray-400 hover:text-gray-600',
+                            ]"
+                        >
+                            ✋ Submit For Approval
+                        </button>
+                    </div>
+                    <p v-if="executionMode === 'approval'" class="mt-2 text-xs text-gray-400">
+                        This action will be queued for approval before execution.
+                    </p>
                 </div>
 
                 <!-- Scrollable body -->
@@ -465,7 +508,12 @@ onUnmounted(() => document.removeEventListener('keydown', onKey));
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                         </svg>
-                        {{ loading ? 'Executing…' : 'Execute Action' }}
+                        <template v-if="loading">
+                            {{ executionMode === 'approval' ? 'Submitting…' : 'Executing…' }}
+                        </template>
+                        <template v-else>
+                            {{ executionMode === 'approval' ? 'Submit For Approval' : 'Execute Action' }}
+                        </template>
                     </button>
                 </div>
             </div>
