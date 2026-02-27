@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\GovernanceController;
 use App\Http\Controllers\Api\V1\InstitutionController;
 use App\Http\Controllers\Api\V1\RegionController;
 use App\Http\Controllers\Api\V1\RegionalRiskIntelligenceController;
+use App\Http\Controllers\Api\V1\RiskContagionController;
 use App\Http\Controllers\Api\V1\RiskIntelligenceController;
 use App\Http\Controllers\Api\V1\TransparencyController;
 use Illuminate\Http\Request;
@@ -158,4 +159,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::apiResource('alert-subscriptions', AlertSubscriptionController::class)
             ->whereUuid('alert_subscription');
     });
+
+    // ─── Internal SuperAdmin Routes ────────────────────────────────────────
+    Route::middleware(['auth:sanctum', 'throttle:60,1'])
+        ->prefix('internal')
+        ->name('internal.')
+        ->group(function () {
+            Route::post('/risk/contagion', [RiskContagionController::class, 'execute'])
+                ->name('risk.contagion');
+        });
 });
