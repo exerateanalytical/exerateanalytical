@@ -56,6 +56,7 @@ const formatDate = (iso) => iso
                 </select>
                 <select v-model="status" @change="applyFilters" class="text-sm border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500">
                     <option value="">All statuses</option>
+                    <option value="draft">Draft</option>
                     <option value="active">Active</option>
                     <option value="milestone_reached">Milestone Reached</option>
                     <option value="submitted">Submitted</option>
@@ -109,11 +110,12 @@ const formatDate = (iso) => iso
 
             <!-- Pagination -->
             <div v-if="petitions.last_page > 1" class="flex justify-center gap-1">
-                <a
+                <Link
                     v-for="link in petitions.links"
                     :key="link.label"
                     :href="link.url ?? '#'"
                     v-html="link.label"
+                    preserve-scroll
                     :class="[
                         'px-3 py-1.5 text-sm rounded-lg border transition',
                         link.active ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300',

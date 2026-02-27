@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import CivicLayout from '@/Layouts/CivicLayout.vue';
 
@@ -16,6 +16,9 @@ const form = reactive({
 
 const errors  = ref({});
 const saving  = ref(false);
+
+const BODY_MAX = 20000;
+const bodyCharsLeft = computed(() => BODY_MAX - (form.body?.length ?? 0));
 
 const submit = async () => {
     errors.value = {};
@@ -70,18 +73,24 @@ const submit = async () => {
                 <!-- Body -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Full text <span class="text-red-500">*</span></label>
-                    <textarea v-model="form.body" rows="8" required
+                    <textarea v-model="form.body" rows="8" required :maxlength="BODY_MAX"
                         class="w-full border-gray-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
                         placeholder="Explain the issue, the ask, and the expected impact in full…" />
-                    <p v-if="errors.body" class="text-red-500 text-xs mt-1">{{ errors.body[0] }}</p>
+                    <div class="flex justify-between mt-1">
+                        <p v-if="errors.body" class="text-red-500 text-xs">{{ errors.body[0] }}</p>
+                        <p :class="['text-xs ml-auto', bodyCharsLeft < 500 ? 'text-amber-500' : 'text-gray-400']">
+                            {{ bodyCharsLeft.toLocaleString() }} characters remaining
+                        </p>
+                    </div>
                 </div>
 
                 <!-- Signature goal + region + deadline -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Signature goal</label>
-                        <input v-model.number="form.signature_goal" type="number" min="1"
+                        <input v-model.number="form.signature_goal" type="number" min="1" max="10000000"
                             class="w-full border-gray-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500" />
+                        <p v-if="errors.signature_goal" class="text-red-500 text-xs mt-1">{{ errors.signature_goal[0] }}</p>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Deadline</label>

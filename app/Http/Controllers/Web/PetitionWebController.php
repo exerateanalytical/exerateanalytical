@@ -16,7 +16,6 @@ class PetitionWebController extends Controller
     public function index(Request $request): Response
     {
         $petitions = Petition::with(['creator:id,name,reputation_tier', 'region:id,name,code'])
-            ->withCount('reactions')
             ->where('status', '!=', 'restricted')
             ->when($request->region_id, fn ($q) => $q->where('region_id', $request->region_id))
             ->when($request->status,    fn ($q) => $q->where('status', $request->status))

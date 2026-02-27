@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
+// Link is used for both navigation and pagination to preserve Inertia's SPA behaviour
 import CivicLayout from '@/Layouts/CivicLayout.vue';
 import StatusPill from '@/Components/Civic/StatusPill.vue';
 import TierBadge from '@/Components/Civic/TierBadge.vue';
@@ -98,11 +99,12 @@ const formatDate = (iso) => iso
 
             <!-- Pagination -->
             <div v-if="polls.last_page > 1" class="flex justify-center gap-1">
-                <a
+                <Link
                     v-for="link in polls.links"
                     :key="link.label"
                     :href="link.url ?? '#'"
                     v-html="link.label"
+                    preserve-scroll
                     :class="[
                         'px-3 py-1.5 text-sm rounded-lg border transition',
                         link.active

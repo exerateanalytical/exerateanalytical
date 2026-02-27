@@ -50,7 +50,11 @@ const submit = async () => {
 <template>
     <CivicLayout title="Create Poll">
         <template #header>
-            <h1 class="text-2xl font-bold text-gray-900">Create Poll</h1>
+            <div class="flex items-center gap-3 flex-wrap">
+                <a :href="route('civic.polls.index')" class="text-sm text-gray-500 hover:text-gray-700">← Polls</a>
+                <span class="text-gray-300">/</span>
+                <span class="text-sm font-semibold text-gray-800">Create Poll</span>
+            </div>
         </template>
 
         <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

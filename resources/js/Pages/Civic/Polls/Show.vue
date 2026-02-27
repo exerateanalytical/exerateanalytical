@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import CivicLayout from '@/Layouts/CivicLayout.vue';
 import StatusPill from '@/Components/Civic/StatusPill.vue';
@@ -9,14 +9,24 @@ import ReactionBar from '@/Components/Civic/ReactionBar.vue';
 const props = defineProps({
     poll:           { type: Object, required: true },
     userVote:       { type: Object, default: null },
+    voteCounts:     { type: Object, default: () => ({}) },
     reactionCounts: { type: Object, default: () => ({}) },
     userReaction:   { type: String, default: null },
 });
 
-const selected  = ref([]);
-const error     = ref('');
+const selected   = ref([]);
+const error      = ref('');
 const submitting = ref(false);
-const voted     = ref(!!props.userVote);
+const voted      = ref(!!props.userVote);
+
+const options = computed(() => props.poll.options ?? []);
+
+// Show results when the user voted or the poll is no longer active
+const showResults = computed(() => voted.value || props.poll.status !== 'active');
+
+// Percentage of voters who selected each option (relative to total_votes)
+const totalVoters = computed(() => Math.max(1, props.poll.total_votes ?? 0));
+const pctFor = (opt) => Math.round(((props.voteCounts[opt] ?? 0) / totalVoters.value) * 100);
 
 const toggleOption = (opt) => {
     if (props.poll.allow_multiple_votes) {
@@ -29,14 +39,14 @@ const toggleOption = (opt) => {
 
 const submitVote = async () => {
     if (!selected.value.length) { error.value = 'Please select an option.'; return; }
-    error.value = '';
+    error.value  = '';
     submitting.value = true;
     try {
         await window.axios.post(`/api/v1/polls/${props.poll.id}/vote`, {
             selected_options: selected.value,
         });
         voted.value = true;
-        router.reload({ only: ['poll'] });
+        router.reload({ only: ['poll', 'voteCounts'] });
     } catch (err) {
         error.value = err.response?.data?.meta?.message ?? 'Could not record vote. Please try again.';
     } finally {
@@ -87,14 +97,15 @@ const formatDate = (iso) => iso
                 <p class="text-sm text-blue-500 mt-1">Thank you for participating.</p>
             </div>
 
-            <!-- Voting form -->
-            <div v-else-if="poll.status === 'active' && $page.props.auth?.user" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+            <!-- Voting form (active + authenticated + not yet voted) -->
+            <div v-else-if="poll.status === 'active' && $page.props.auth?.user"
+                class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <h2 class="font-semibold text-gray-800">Cast your vote</h2>
                 <p v-if="poll.allow_multiple_votes" class="text-xs text-gray-500">You may select multiple options.</p>
 
                 <div class="space-y-2">
                     <button
-                        v-for="opt in poll.options"
+                        v-for="opt in options"
                         :key="opt"
                         type="button"
                         @click="toggleOption(opt)"
@@ -106,7 +117,17 @@ const formatDate = (iso) => iso
                         ]"
                     >
                         <span class="flex items-center gap-2">
-                            <span :class="['w-4 h-4 rounded-full border-2 shrink-0 transition', selected.includes(opt) ? 'border-blue-500 bg-blue-500' : 'border-gray-300']" />
+                            <!-- Circle for single-choice, square for multi-choice -->
+                            <span :class="[
+                                'w-4 h-4 border-2 shrink-0 transition flex items-center justify-center',
+                                poll.allow_multiple_votes ? 'rounded' : 'rounded-full',
+                                selected.includes(opt) ? 'border-blue-500 bg-blue-500' : 'border-gray-300',
+                            ]">
+                                <svg v-if="selected.includes(opt) && poll.allow_multiple_votes"
+                                    class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2 6l3 3 5-5"/>
+                                </svg>
+                            </span>
                             {{ opt }}
                         </span>
                     </button>
@@ -132,11 +153,36 @@ const formatDate = (iso) => iso
                 </p>
             </div>
 
-            <!-- Options summary (always shown) -->
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <!-- Results (shown after voting or when poll is not active) -->
+            <div v-if="showResults && options.length" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <h2 class="font-semibold text-gray-800 mb-4">
+                    Results
+                    <span class="ml-2 text-xs font-normal text-gray-400">{{ poll.total_votes }} voter{{ poll.total_votes !== 1 ? 's' : '' }}</span>
+                </h2>
+                <div class="space-y-3">
+                    <div v-for="opt in options" :key="opt">
+                        <div class="flex items-center justify-between text-sm mb-1">
+                            <span class="text-gray-700 font-medium">{{ opt }}</span>
+                            <span class="text-gray-500 text-xs shrink-0 ml-2">
+                                {{ voteCounts[opt] ?? 0 }} vote{{ (voteCounts[opt] ?? 0) !== 1 ? 's' : '' }}
+                                · {{ pctFor(opt) }}%
+                            </span>
+                        </div>
+                        <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                            <div
+                                class="h-2 rounded-full bg-blue-500 transition-all"
+                                :style="{ width: pctFor(opt) + '%' }"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Options list (only shown when poll is still active and user hasn't voted yet) -->
+            <div v-else-if="options.length" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
                 <h2 class="font-semibold text-gray-800 mb-3">Options</h2>
                 <ul class="space-y-2">
-                    <li v-for="opt in poll.options" :key="opt"
+                    <li v-for="opt in options" :key="opt"
                         class="flex items-center gap-2 text-sm text-gray-700">
                         <span class="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
                         {{ opt }}

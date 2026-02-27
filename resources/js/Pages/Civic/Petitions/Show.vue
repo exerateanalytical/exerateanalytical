@@ -93,7 +93,8 @@ const formatDate = (iso) => iso
             <!-- Full text -->
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
                 <h2 class="font-semibold text-gray-800 mb-4">Full Text</h2>
-                <div class="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">{{ petition.body }}</div>
+                <div v-if="petition.body" class="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">{{ petition.body }}</div>
+                <p v-else class="text-sm text-gray-400 italic">No full text provided for this petition.</p>
             </div>
 
             <!-- Reactions -->
