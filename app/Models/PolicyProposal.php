@@ -6,10 +6,9 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-class Petition extends Model
+class PolicyProposal extends Model
 {
     use HasFactory, HasUuids;
 
@@ -17,18 +16,10 @@ class Petition extends Model
         'creator_id',
         'region_id',
         'title',
-        'summary',
-        'body',
-        'signature_goal',
-        'signature_count',
+        'abstract',
+        'full_text',
+        'stage',
         'status',
-        'deadline',
-    ];
-
-    protected $casts = [
-        'deadline'        => 'datetime',
-        'signature_goal'  => 'integer',
-        'signature_count' => 'integer',
     ];
 
     public function creator(): BelongsTo
@@ -39,11 +30,6 @@ class Petition extends Model
     public function region(): BelongsTo
     {
         return $this->belongsTo(FederationRegion::class, 'region_id');
-    }
-
-    public function signatures(): HasMany
-    {
-        return $this->hasMany(PetitionSignature::class);
     }
 
     public function reactions(): MorphMany

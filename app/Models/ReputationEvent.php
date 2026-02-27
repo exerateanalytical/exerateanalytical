@@ -7,26 +7,21 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class PetitionSignature extends Model
+class ReputationEvent extends Model
 {
     use HasFactory, HasUuids;
 
     protected $fillable = [
-        'petition_id',
         'user_id',
-        'weight',
-        'signed_at',
+        'event_type',
+        'delta',
+        'context_type',
+        'context_id',
     ];
 
     protected $casts = [
-        'signed_at' => 'datetime',
-        'weight'    => 'decimal:3',
+        'delta' => 'decimal:3',
     ];
-
-    public function petition(): BelongsTo
-    {
-        return $this->belongsTo(Petition::class);
-    }
 
     public function user(): BelongsTo
     {

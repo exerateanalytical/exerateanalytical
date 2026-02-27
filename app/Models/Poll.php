@@ -7,9 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-class Petition extends Model
+class Poll extends Model
 {
     use HasFactory, HasUuids;
 
@@ -17,18 +16,24 @@ class Petition extends Model
         'creator_id',
         'region_id',
         'title',
-        'summary',
-        'body',
-        'signature_goal',
-        'signature_count',
+        'description',
+        'visibility',
+        'type',
+        'options',
+        'starts_at',
+        'ends_at',
+        'allow_multiple_votes',
+        'verified_only',
+        'total_votes',
         'status',
-        'deadline',
     ];
 
     protected $casts = [
-        'deadline'        => 'datetime',
-        'signature_goal'  => 'integer',
-        'signature_count' => 'integer',
+        'options'              => 'array',
+        'starts_at'            => 'datetime',
+        'ends_at'              => 'datetime',
+        'allow_multiple_votes' => 'boolean',
+        'verified_only'        => 'boolean',
     ];
 
     public function creator(): BelongsTo
@@ -41,18 +46,8 @@ class Petition extends Model
         return $this->belongsTo(FederationRegion::class, 'region_id');
     }
 
-    public function signatures(): HasMany
+    public function votes(): HasMany
     {
-        return $this->hasMany(PetitionSignature::class);
-    }
-
-    public function reactions(): MorphMany
-    {
-        return $this->morphMany(Reaction::class, 'reactable');
-    }
-
-    public function moderationLogs(): MorphMany
-    {
-        return $this->morphMany(ModerationLog::class, 'subject');
+        return $this->hasMany(PollVote::class);
     }
 }
