@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\ExecutiveAlertController;
 use App\Http\Controllers\Api\V1\ExecutiveBriefController;
 use App\Http\Controllers\Api\V1\ExecutiveControlTowerController;
 use App\Http\Controllers\Api\V1\ExecutiveGovernanceMetricsController;
+use App\Http\Controllers\Api\V1\GovernanceActionController;
 use App\Http\Controllers\Api\V1\ExecutiveNationalController;
 use App\Http\Controllers\Api\V1\ExecutiveNetworkRankingController;
 use App\Http\Controllers\Api\V1\ExecutiveRiskDashboardController;
@@ -175,6 +176,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         ->group(function () {
             Route::post('/risk/contagion', [RiskContagionController::class, 'execute'])
                 ->name('risk.contagion');
+
+            Route::post('/governance/actions', [GovernanceActionController::class, 'store'])
+                ->name('governance.actions.store');
         });
 
     // ─── Civic Participation Routes ─────────────────────────────────────────
