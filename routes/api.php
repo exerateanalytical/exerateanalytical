@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\ExecutiveGovernanceMetricsController;
 use App\Http\Controllers\Api\V1\GovernanceActionController;
 use App\Http\Controllers\Api\V1\GovernanceInfluenceController;
 use App\Http\Controllers\Api\V1\GovernanceRecommendationController;
+use App\Http\Controllers\Api\V1\InstitutionalInfluenceController;
 use App\Http\Controllers\Api\V1\ExecutiveNationalController;
 use App\Http\Controllers\Api\V1\ExecutiveNetworkRankingController;
 use App\Http\Controllers\Api\V1\ExecutiveRiskDashboardController;
@@ -179,6 +180,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('/executive/recommendations/{recommendation}/dismiss', [GovernanceRecommendationController::class, 'dismiss'])
             ->whereUuid('recommendation')
             ->name('executive.recommendations.dismiss');
+
+        // CT-8 Institutional & Actor Intelligence — executive-only read analytics
+        Route::get('/executive/actors/influence', [InstitutionalInfluenceController::class, 'index'])
+            ->name('executive.actors.influence');
 
         // Alert Subscription management (SuperAdmin only)
         Route::apiResource('alert-subscriptions', AlertSubscriptionController::class)

@@ -28,3 +28,6 @@ Schedule::command('governance:refresh-recommendations')->everyTenMinutes();
 
 // CT-7 Governance Causality & Influence Map — run after advisor refresh
 Schedule::command('governance:compute-influences')->everyTenMinutes();
+
+// CT-8 Institutional & Actor Intelligence Layer — every 30 minutes
+Schedule::command('governance:compute-institutional-influences')->everyThirtyMinutes();

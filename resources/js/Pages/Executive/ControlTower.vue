@@ -14,6 +14,7 @@ const props = defineProps({
     representation_index: { type: Array,  default: () => [] },
     recommendations:      { type: Array,  default: () => [] },
     influences:           { type: Array,  default: () => [] },
+    actors:               { type: Array,  default: () => [] },
     generated_at:         { type: String, default: null },
 });
 
@@ -26,6 +27,7 @@ const contagionForecast   = ref(props.contagion_forecast);
 const representationIndex = ref(props.representation_index);
 const recommendations     = ref(props.recommendations);
 const influences          = ref(props.influences);
+const actors              = ref(props.actors);
 const generatedAt         = ref(props.generated_at);
 const refreshing          = ref(false);
 const refreshError        = ref(null);
@@ -61,10 +63,11 @@ async function refresh() {
     refreshing.value   = true;
     refreshError.value = null;
     try {
-        const [ctRes, recRes, infRes] = await Promise.all([
+        const [ctRes, recRes, infRes, actorRes] = await Promise.all([
             axios.get('/api/v1/executive/control-tower'),
             axios.get('/api/v1/executive/recommendations'),
             axios.get('/api/v1/executive/influences'),
+            axios.get('/api/v1/executive/actors/influence').catch(() => ({ data: { data: [] } })),
         ]);
         const d = ctRes.data.data ?? {};
         hero.value                = d.hero                 ?? null;
@@ -76,6 +79,7 @@ async function refresh() {
         generatedAt.value         = ctRes.data.meta?.generated_at ?? null;
         recommendations.value     = recRes.data.data ?? [];
         influences.value          = infRes.data.data ?? [];
+        actors.value              = actorRes.data.data ?? [];
     } catch {
         refreshError.value = 'Refresh failed. Data may be stale.';
     } finally {
@@ -168,6 +172,50 @@ const infScoreCls = (score) => {
 };
 
 const infBarCls = (score) => {
+    if (score >= 60) return 'bg-red-500';
+    if (score >= 30) return 'bg-amber-400';
+    return 'bg-emerald-500';
+};
+
+// ── Institutional Influence (CT-8) ────────────────────────────────────────────
+const selectedActor = ref(null);
+
+function openActorDrawer(row) {
+    selectedActor.value = row;
+}
+
+function closeActorDrawer() {
+    selectedActor.value = null;
+}
+
+const CATEGORY_META = {
+    civic_leader:      { label: 'Civic Leader',      cls: 'bg-amber-100  text-amber-700  border-amber-200',   dot: 'bg-amber-500'   },
+    policy_driver:     { label: 'Policy Driver',     cls: 'bg-violet-100 text-violet-700 border-violet-200',  dot: 'bg-violet-500'  },
+    trust_stabilizer:  { label: 'Trust Stabilizer',  cls: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+    volatility_source: { label: 'Volatility Source', cls: 'bg-red-100    text-red-700    border-red-200',     dot: 'bg-red-500'     },
+};
+
+const catMeta = (cat) => CATEGORY_META[cat] ?? CATEGORY_META.civic_leader;
+
+const trustDeltaCls = (delta) => {
+    const d = parseFloat(delta);
+    if (isNaN(d) || d === 0) return 'text-gray-400';
+    return d > 0 ? 'text-emerald-600' : 'text-red-500';
+};
+
+const fmtDelta = (delta) => {
+    const d = parseFloat(delta);
+    if (isNaN(d)) return '—';
+    return (d >= 0 ? '+' : '') + d.toFixed(2);
+};
+
+const actorScoreCls = (score) => {
+    if (score >= 60) return 'text-red-600';
+    if (score >= 30) return 'text-amber-600';
+    return 'text-emerald-600';
+};
+
+const actorBarCls = (score) => {
     if (score >= 60) return 'bg-red-500';
     if (score >= 30) return 'bg-amber-400';
     return 'bg-emerald-500';
@@ -841,6 +889,80 @@ const pct = (v, decimals = 1) =>
                 </div>
             </section>
 
+            <!-- ── H. INSTITUTIONAL INFLUENCE ────────────────────────────── -->
+            <section>
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Institutional Influence
+                    </h2>
+                    <span class="text-xs text-gray-400">Last 30 days · Click a row for breakdown</span>
+                </div>
+
+                <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div v-if="actors.length" class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actor</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Influence</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Trust Δ</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Bar</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <tr
+                                    v-for="row in actors"
+                                    :key="row.id"
+                                    class="hover:bg-gray-50 transition cursor-pointer"
+                                    @click="openActorDrawer(row)"
+                                >
+                                    <td class="px-4 py-3">
+                                        <p class="font-semibold text-gray-900 text-sm truncate max-w-[160px]">
+                                            {{ row.actor?.name ?? '—' }}
+                                        </p>
+                                        <p v-if="row.region" class="text-xs text-gray-400 font-mono mt-0.5">
+                                            {{ row.region.code ?? row.region.name }}
+                                        </p>
+                                        <span v-else class="text-xs text-indigo-400">Global</span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span :class="[
+                                            'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border',
+                                            catMeta(row.influence_category).cls,
+                                        ]">
+                                            <span :class="['w-1.5 h-1.5 rounded-full shrink-0', catMeta(row.influence_category).dot]" />
+                                            {{ catMeta(row.influence_category).label }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <span :class="['font-bold tabular-nums', actorScoreCls(row.influence_score)]">
+                                            {{ row.influence_score != null ? Number(row.influence_score).toFixed(1) : '—' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <span :class="['font-semibold tabular-nums text-sm', trustDeltaCls(row.trust_delta)]">
+                                            {{ fmtDelta(row.trust_delta) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="h-2 bg-gray-100 rounded-full overflow-hidden w-28">
+                                            <div
+                                                :class="['h-full rounded-full transition-all duration-500', actorBarCls(row.influence_score)]"
+                                                :style="{ width: `${Math.min(100, Math.max(0, row.influence_score ?? 0))}%` }"
+                                            />
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div v-else class="px-6 py-10 text-center text-sm text-gray-400">
+                        No institutional influence data yet. Signals are computed every 30 minutes from the last 30 days of civic activity.
+                    </div>
+                </div>
+            </section>
+
         </div>
         <!-- ── Action Modal ─────────────────────────────────────────────── -->
         <Transition
@@ -979,6 +1101,156 @@ const pct = (v, decimals = 1) =>
                         <div>
                             <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Computed At</p>
                             <p class="text-sm text-gray-600">{{ fmt(selectedInfluence.calculated_at) }}</p>
+                        </div>
+
+                    </div>
+                </aside>
+            </Transition>
+        </Teleport>
+
+        <!-- ── Actor Detail Drawer ────────────────────────────────────── -->
+        <Teleport to="body">
+            <Transition
+                enter-from-class="opacity-0"
+                enter-active-class="transition duration-150 ease-out"
+                enter-to-class="opacity-100"
+                leave-from-class="opacity-100"
+                leave-active-class="transition duration-150 ease-in"
+                leave-to-class="opacity-0"
+            >
+                <div
+                    v-if="selectedActor"
+                    class="fixed inset-0 z-40 bg-black/30"
+                    @click="closeActorDrawer"
+                />
+            </Transition>
+
+            <Transition
+                enter-from-class="translate-x-full"
+                enter-active-class="transition duration-200 ease-out"
+                enter-to-class="translate-x-0"
+                leave-from-class="translate-x-0"
+                leave-active-class="transition duration-150 ease-in"
+                leave-to-class="translate-x-full"
+            >
+                <aside
+                    v-if="selectedActor"
+                    class="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl z-50 flex flex-col overflow-y-auto"
+                >
+                    <!-- Drawer header -->
+                    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200 shrink-0">
+                        <h3 class="text-base font-bold text-gray-900">Actor Influence Profile</h3>
+                        <button
+                            @click="closeActorDrawer"
+                            class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                            aria-label="Close"
+                        >
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Drawer body -->
+                    <div class="flex-1 px-6 py-6 space-y-6">
+
+                        <!-- Identity -->
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Actor</p>
+                                <p class="text-lg font-bold text-gray-900">{{ selectedActor.actor?.name ?? '—' }}</p>
+                                <p class="text-xs text-gray-400 mt-0.5">{{ selectedActor.actor?.email ?? '' }}</p>
+                            </div>
+                            <span :class="[
+                                'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-full border shrink-0 mt-1',
+                                catMeta(selectedActor.influence_category).cls,
+                            ]">
+                                <span :class="['w-1.5 h-1.5 rounded-full shrink-0', catMeta(selectedActor.influence_category).dot]" />
+                                {{ catMeta(selectedActor.influence_category).label }}
+                            </span>
+                        </div>
+
+                        <!-- Influence score bar -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Influence Score</p>
+                                <span :class="['text-2xl font-extrabold tabular-nums', actorScoreCls(selectedActor.influence_score)]">
+                                    {{ selectedActor.influence_score != null ? Number(selectedActor.influence_score).toFixed(1) : '—' }}
+                                </span>
+                            </div>
+                            <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                    :class="['h-full rounded-full', actorBarCls(selectedActor.influence_score)]"
+                                    :style="{ width: `${Math.min(100, Math.max(0, selectedActor.influence_score ?? 0))}%` }"
+                                />
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">0 – 100 normalised · participation 40 pts · engagement 30 pts · trust 30 pts</p>
+                        </div>
+
+                        <!-- Trust delta -->
+                        <div class="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+                            <div>
+                                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Trust Δ (30 days)</p>
+                                <p class="text-xs text-gray-400 mt-0.5">Sum of reputation event deltas</p>
+                            </div>
+                            <span :class="['text-2xl font-extrabold tabular-nums', trustDeltaCls(selectedActor.trust_delta)]">
+                                {{ fmtDelta(selectedActor.trust_delta) }}
+                            </span>
+                        </div>
+
+                        <!-- Activity breakdown -->
+                        <div>
+                            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Activity Breakdown</p>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
+                                    <p class="text-2xl font-bold text-blue-700 tabular-nums">
+                                        {{ selectedActor.activity_breakdown?.polls_created ?? 0 }}
+                                    </p>
+                                    <p class="text-xs font-medium text-blue-500 mt-1">Polls Created</p>
+                                </div>
+                                <div class="bg-violet-50 border border-violet-100 rounded-xl p-3 text-center">
+                                    <p class="text-2xl font-bold text-violet-700 tabular-nums">
+                                        {{ selectedActor.activity_breakdown?.petitions_created ?? 0 }}
+                                    </p>
+                                    <p class="text-xs font-medium text-violet-500 mt-1">Petitions Created</p>
+                                </div>
+                                <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-center">
+                                    <p class="text-2xl font-bold text-indigo-700 tabular-nums">
+                                        {{ selectedActor.activity_breakdown?.petitions_signed ?? 0 }}
+                                    </p>
+                                    <p class="text-xs font-medium text-indigo-500 mt-1">Petitions Signed</p>
+                                </div>
+                                <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 text-center">
+                                    <p class="text-2xl font-bold text-amber-700 tabular-nums">
+                                        {{ selectedActor.activity_breakdown?.policies_created ?? 0 }}
+                                    </p>
+                                    <p class="text-xs font-medium text-amber-600 mt-1">Policies Created</p>
+                                </div>
+                                <div class="col-span-2 bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
+                                    <p class="text-2xl font-bold text-gray-700 tabular-nums">
+                                        {{ selectedActor.activity_breakdown?.reactions_received ?? 0 }}
+                                    </p>
+                                    <p class="text-xs font-medium text-gray-500 mt-1">Reactions Received</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Region -->
+                        <div>
+                            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Region</p>
+                            <p class="text-sm font-semibold text-gray-800" v-if="selectedActor.region">
+                                {{ selectedActor.region.name ?? selectedActor.region.code }}
+                                <span v-if="selectedActor.region.code && selectedActor.region.name" class="text-gray-400 font-mono text-xs ml-1">
+                                    ({{ selectedActor.region.code }})
+                                </span>
+                            </p>
+                            <p class="text-sm font-medium text-indigo-600" v-else>Global (no specific region)</p>
+                        </div>
+
+                        <!-- Computed at -->
+                        <div>
+                            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Computed At</p>
+                            <p class="text-sm text-gray-600">{{ fmt(selectedActor.calculated_at) }}</p>
                         </div>
 
                     </div>

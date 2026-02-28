@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\GovernanceInfluence;
 use App\Models\GovernanceRecommendation;
+use App\Models\InstitutionalInfluence;
 use App\Services\Executive\ControlTowerService;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -32,7 +34,7 @@ class ExecutiveControlTowerWebController extends Controller
         $latestInfluenceAt = GovernanceInfluence::max('calculated_at');
         $influences = collect();
         if ($latestInfluenceAt) {
-            $cutoff = \Illuminate\Support\Carbon::parse($latestInfluenceAt)->subSeconds(60);
+            $cutoff = Carbon::parse($latestInfluenceAt)->subSeconds(60);
             $influences = GovernanceInfluence::with('region:id,code,name')
                 ->where('calculated_at', '>=', $cutoff)
                 ->orderByRaw("CASE influence_type
@@ -40,6 +42,17 @@ class ExecutiveControlTowerWebController extends Controller
                     WHEN 'trust_shift'        THEN 2
                     WHEN 'participation_gap'  THEN 3
                     ELSE 4 END ASC")
+                ->orderByDesc('influence_score')
+                ->get();
+        }
+
+        // Seed latest institutional actor influence snapshot (executive-only).
+        $latestActorAt = InstitutionalInfluence::max('calculated_at');
+        $actors = collect();
+        if ($latestActorAt) {
+            $cutoff = Carbon::parse($latestActorAt)->subSeconds(60);
+            $actors = InstitutionalInfluence::with('actor:id,name,email', 'region:id,code,name')
+                ->where('calculated_at', '>=', $cutoff)
                 ->orderByDesc('influence_score')
                 ->get();
         }
@@ -53,6 +66,7 @@ class ExecutiveControlTowerWebController extends Controller
             'representation_index' => $payload['representation_index'],
             'recommendations'      => $recommendations,
             'influences'           => $influences,
+            'actors'               => $actors,
             'generated_at'         => now()->toIso8601String(),
         ]);
     }
