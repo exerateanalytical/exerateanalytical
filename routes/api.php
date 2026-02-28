@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\ExecutiveBriefController;
 use App\Http\Controllers\Api\V1\ExecutiveControlTowerController;
 use App\Http\Controllers\Api\V1\ExecutiveGovernanceMetricsController;
 use App\Http\Controllers\Api\V1\GovernanceActionController;
+use App\Http\Controllers\Api\V1\GovernanceInfluenceController;
 use App\Http\Controllers\Api\V1\GovernanceRecommendationController;
 use App\Http\Controllers\Api\V1\ExecutiveNationalController;
 use App\Http\Controllers\Api\V1\ExecutiveNetworkRankingController;
@@ -104,6 +105,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/executive/recommendations/{recommendation}/scenarios', [GovernanceRecommendationController::class, 'scenarios'])
             ->whereUuid('recommendation')
             ->name('executive.recommendations.scenarios');
+        Route::get('/executive/influences', [GovernanceInfluenceController::class, 'index'])
+            ->name('executive.influences');
 
         // Federation aggregated snapshots
         Route::get('/federation/global', [FederationController::class, 'global'])->name('federation.global');

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\GovernanceInfluence;
 use App\Models\GovernanceRecommendation;
 use App\Services\Executive\ControlTowerService;
 use Inertia\Inertia;
@@ -27,6 +28,22 @@ class ExecutiveControlTowerWebController extends Controller
             ->orderByDesc('confidence_score')
             ->get();
 
+        // Seed latest influence signals (most recent batch, grouped by type then score).
+        $latestInfluenceAt = GovernanceInfluence::max('calculated_at');
+        $influences = collect();
+        if ($latestInfluenceAt) {
+            $cutoff = \Illuminate\Support\Carbon::parse($latestInfluenceAt)->subSeconds(60);
+            $influences = GovernanceInfluence::with('region:id,code,name')
+                ->where('calculated_at', '>=', $cutoff)
+                ->orderByRaw("CASE influence_type
+                    WHEN 'contagion_pressure' THEN 1
+                    WHEN 'trust_shift'        THEN 2
+                    WHEN 'participation_gap'  THEN 3
+                    ELSE 4 END ASC")
+                ->orderByDesc('influence_score')
+                ->get();
+        }
+
         return Inertia::render('Executive/ControlTower', [
             'hero'                 => $payload['hero'],
             'regions'              => $payload['regions'],
@@ -35,6 +52,7 @@ class ExecutiveControlTowerWebController extends Controller
             'contagion_forecast'   => $payload['contagion_forecast'],
             'representation_index' => $payload['representation_index'],
             'recommendations'      => $recommendations,
+            'influences'           => $influences,
             'generated_at'         => now()->toIso8601String(),
         ]);
     }

@@ -25,3 +25,6 @@ Schedule::command('risk:compute-federation-global')->everyFiveMinutes();
 
 // AI Governance Advisor — refresh recommendations every 10 minutes
 Schedule::command('governance:refresh-recommendations')->everyTenMinutes();
+
+// CT-7 Governance Causality & Influence Map — run after advisor refresh
+Schedule::command('governance:compute-influences')->everyTenMinutes();

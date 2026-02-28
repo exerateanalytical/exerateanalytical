@@ -13,6 +13,7 @@ const props = defineProps({
     contagion_forecast:   { type: Object, default: null },
     representation_index: { type: Array,  default: () => [] },
     recommendations:      { type: Array,  default: () => [] },
+    influences:           { type: Array,  default: () => [] },
     generated_at:         { type: String, default: null },
 });
 
@@ -24,6 +25,7 @@ const civicMomentum       = ref(props.civic_momentum);
 const contagionForecast   = ref(props.contagion_forecast);
 const representationIndex = ref(props.representation_index);
 const recommendations     = ref(props.recommendations);
+const influences          = ref(props.influences);
 const generatedAt         = ref(props.generated_at);
 const refreshing          = ref(false);
 const refreshError        = ref(null);
@@ -59,9 +61,10 @@ async function refresh() {
     refreshing.value   = true;
     refreshError.value = null;
     try {
-        const [ctRes, recRes] = await Promise.all([
+        const [ctRes, recRes, infRes] = await Promise.all([
             axios.get('/api/v1/executive/control-tower'),
             axios.get('/api/v1/executive/recommendations'),
+            axios.get('/api/v1/executive/influences'),
         ]);
         const d = ctRes.data.data ?? {};
         hero.value                = d.hero                 ?? null;
@@ -72,6 +75,7 @@ async function refresh() {
         representationIndex.value = d.representation_index ?? [];
         generatedAt.value         = ctRes.data.meta?.generated_at ?? null;
         recommendations.value     = recRes.data.data ?? [];
+        influences.value          = infRes.data.data ?? [];
     } catch {
         refreshError.value = 'Refresh failed. Data may be stale.';
     } finally {
@@ -126,6 +130,48 @@ const SEVERITY_META = {
 
 const sevMeta  = (s) => SEVERITY_META[s] ?? SEVERITY_META.low;
 const truncate = (str, max = 140) => str && str.length > max ? str.slice(0, max) + '…' : (str ?? '');
+
+// ── Governance Influence Map ──────────────────────────────────────────────────
+const selectedInfluence = ref(null);
+
+function openInfluenceDrawer(row) {
+    selectedInfluence.value = row;
+}
+
+function closeInfluenceDrawer() {
+    selectedInfluence.value = null;
+}
+
+const INFLUENCE_TYPE_LABELS = {
+    trust_shift:        'Trust Shift',
+    participation_gap:  'Participation Gap',
+    contagion_pressure: 'Contagion Pressure',
+};
+
+const INFLUENCE_TYPE_EXPLANATIONS = {
+    contagion_pressure: 'A high cascade index from the latest risk contagion run is creating systemic pressure. Regions downstream of the origin may see elevated fragility.',
+    trust_shift:        'Aggregate reputation delta across the network is trending negative, indicating erosion of institutional trust. Sustained negative momentum signals governance deterioration.',
+    participation_gap:  'A measurable gap between eligible and active participants has been detected. Low engagement widens accountability gaps and reduces policy legitimacy.',
+};
+
+const infTypeCls = (dir) =>
+    dir === 'up'
+        ? 'bg-red-100 text-red-700 border-red-200'
+        : 'bg-emerald-100 text-emerald-700 border-emerald-200';
+
+const infDirLabel = (dir) => dir === 'up' ? '↑ Risk Rising' : '↓ Risk Falling';
+
+const infScoreCls = (score) => {
+    if (score >= 60) return 'text-red-600';
+    if (score >= 30) return 'text-amber-600';
+    return 'text-emerald-600';
+};
+
+const infBarCls = (score) => {
+    if (score >= 60) return 'bg-red-500';
+    if (score >= 30) return 'bg-amber-400';
+    return 'bg-emerald-500';
+};
 
 // ── Display helpers ───────────────────────────────────────────────────────────
 const stabilityBorder = (val) => {
@@ -723,6 +769,78 @@ const pct = (v, decimals = 1) =>
                 </section>
             </div>
 
+            <!-- ── G. GOVERNANCE INFLUENCE MAP ────────────────────────────── -->
+            <section>
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Governance Influence Map
+                    </h2>
+                    <span class="text-xs text-gray-400">Click a row for signal details</span>
+                </div>
+
+                <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div v-if="influences.length" class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Region</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Influence Type</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Direction</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Score</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">Bar</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <tr
+                                    v-for="inf in influences"
+                                    :key="inf.id"
+                                    class="hover:bg-gray-50 transition cursor-pointer"
+                                    @click="openInfluenceDrawer(inf)"
+                                >
+                                    <td class="px-4 py-3">
+                                        <span v-if="inf.region" class="font-semibold text-gray-800 text-sm">
+                                            {{ inf.region.code ?? inf.region.name ?? inf.region_id }}
+                                        </span>
+                                        <span v-else class="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                            Global
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="text-xs font-medium text-gray-700">
+                                            {{ INFLUENCE_TYPE_LABELS[inf.influence_type] ?? inf.influence_type }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span :class="[
+                                            'inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full border',
+                                            infTypeCls(inf.impact_direction),
+                                        ]">
+                                            {{ infDirLabel(inf.impact_direction) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <span :class="['font-bold tabular-nums', infScoreCls(inf.influence_score)]">
+                                            {{ inf.influence_score != null ? Number(inf.influence_score).toFixed(1) : '—' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="h-2 bg-gray-100 rounded-full overflow-hidden w-28">
+                                            <div
+                                                :class="['h-full rounded-full transition-all duration-500', infBarCls(inf.influence_score)]"
+                                                :style="{ width: `${Math.min(100, Math.max(0, inf.influence_score ?? 0))}%` }"
+                                            />
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div v-else class="px-6 py-10 text-center text-sm text-gray-400">
+                        No influence signals computed yet. Signals are generated every 10 minutes.
+                    </div>
+                </div>
+            </section>
+
         </div>
         <!-- ── Action Modal ─────────────────────────────────────────────── -->
         <Transition
@@ -748,6 +866,125 @@ const pct = (v, decimals = 1) =>
             :recommendation="scenarioRec"
             @close="scenarioRec = null"
         />
+
+        <!-- ── Influence Detail Drawer ─────────────────────────────────── -->
+        <Teleport to="body">
+            <Transition
+                enter-from-class="opacity-0"
+                enter-active-class="transition duration-150 ease-out"
+                enter-to-class="opacity-100"
+                leave-from-class="opacity-100"
+                leave-active-class="transition duration-150 ease-in"
+                leave-to-class="opacity-0"
+            >
+                <div
+                    v-if="selectedInfluence"
+                    class="fixed inset-0 z-40 bg-black/30"
+                    @click="closeInfluenceDrawer"
+                />
+            </Transition>
+
+            <Transition
+                enter-from-class="translate-x-full"
+                enter-active-class="transition duration-200 ease-out"
+                enter-to-class="translate-x-0"
+                leave-from-class="translate-x-0"
+                leave-active-class="transition duration-150 ease-in"
+                leave-to-class="translate-x-full"
+            >
+                <aside
+                    v-if="selectedInfluence"
+                    class="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl z-50 flex flex-col overflow-y-auto"
+                >
+                    <!-- Drawer header -->
+                    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200 shrink-0">
+                        <h3 class="text-base font-bold text-gray-900">Influence Signal Detail</h3>
+                        <button
+                            @click="closeInfluenceDrawer"
+                            class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                            aria-label="Close"
+                        >
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Drawer body -->
+                    <div class="flex-1 px-6 py-6 space-y-6">
+
+                        <!-- Influence type + direction badge -->
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Influence Type</p>
+                                <p class="text-lg font-bold text-gray-900">
+                                    {{ INFLUENCE_TYPE_LABELS[selectedInfluence.influence_type] ?? selectedInfluence.influence_type }}
+                                </p>
+                            </div>
+                            <span :class="[
+                                'inline-block text-xs font-semibold px-3 py-1.5 rounded-full border shrink-0 mt-1',
+                                infTypeCls(selectedInfluence.impact_direction),
+                            ]">
+                                {{ infDirLabel(selectedInfluence.impact_direction) }}
+                            </span>
+                        </div>
+
+                        <!-- Score bar -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Influence Score</p>
+                                <span :class="['text-2xl font-extrabold tabular-nums', infScoreCls(selectedInfluence.influence_score)]">
+                                    {{ selectedInfluence.influence_score != null ? Number(selectedInfluence.influence_score).toFixed(1) : '—' }}
+                                </span>
+                            </div>
+                            <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                    :class="['h-full rounded-full', infBarCls(selectedInfluence.influence_score)]"
+                                    :style="{ width: `${Math.min(100, Math.max(0, selectedInfluence.influence_score ?? 0))}%` }"
+                                />
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">0 – 100 normalised scale</p>
+                        </div>
+
+                        <!-- Region -->
+                        <div>
+                            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Region</p>
+                            <p class="text-sm font-semibold text-gray-800" v-if="selectedInfluence.region">
+                                {{ selectedInfluence.region.name ?? selectedInfluence.region.code }}
+                                <span v-if="selectedInfluence.region.code && selectedInfluence.region.name" class="text-gray-400 font-mono text-xs ml-1">
+                                    ({{ selectedInfluence.region.code }})
+                                </span>
+                            </p>
+                            <p class="text-sm font-medium text-indigo-600" v-else>Global (no specific region)</p>
+                        </div>
+
+                        <!-- Source signal -->
+                        <div>
+                            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Source Signal</p>
+                            <p class="text-sm font-semibold text-gray-700 capitalize">{{ selectedInfluence.source_type ?? '—' }}</p>
+                            <p v-if="selectedInfluence.source_id" class="text-xs font-mono text-gray-400 mt-0.5 break-all">
+                                ref: {{ selectedInfluence.source_id }}
+                            </p>
+                        </div>
+
+                        <!-- Explanation -->
+                        <div class="bg-gray-50 border border-gray-100 rounded-xl p-4">
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Signal Explanation</p>
+                            <p class="text-sm text-gray-600 leading-relaxed">
+                                {{ INFLUENCE_TYPE_EXPLANATIONS[selectedInfluence.influence_type] ?? 'This signal was derived from recent civic, risk, or trust data. Review the source record for additional context.' }}
+                            </p>
+                        </div>
+
+                        <!-- Calculated at -->
+                        <div>
+                            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Computed At</p>
+                            <p class="text-sm text-gray-600">{{ fmt(selectedInfluence.calculated_at) }}</p>
+                        </div>
+
+                    </div>
+                </aside>
+            </Transition>
+        </Teleport>
 
         <!-- ── Toast ───────────────────────────────────────────────────── -->
         <Teleport to="body">
