@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\GovernanceInfluence;
 use App\Models\GovernanceRecommendation;
+use App\Models\GovernanceTrajectory;
 use App\Models\InstitutionalInfluence;
 use App\Services\Executive\ControlTowerService;
 use Illuminate\Support\Carbon;
@@ -57,6 +58,34 @@ class ExecutiveControlTowerWebController extends Controller
                 ->get();
         }
 
+        // Seed latest governance trajectory + 7-day sparkline data.
+        $latestTrajectoryAt = GovernanceTrajectory::where('scope', 'global')->max('calculated_at');
+        $trajectoryGlobal   = null;
+        $trajectoryRegions  = collect();
+        $trajectoryTrend    = collect();
+        if ($latestTrajectoryAt) {
+            $cutoff = Carbon::parse($latestTrajectoryAt)->subSeconds(90);
+
+            $trajectoryGlobal = GovernanceTrajectory::where('scope', 'global')
+                ->where('calculated_at', '>=', $cutoff)
+                ->latest('calculated_at')
+                ->first();
+
+            $trajectoryRegions = GovernanceTrajectory::with('region:id,code,name')
+                ->where('scope', 'region')
+                ->where('calculated_at', '>=', $cutoff)
+                ->orderByDesc('trajectory_score')
+                ->get();
+
+            $trajectoryTrend = GovernanceTrajectory::where('scope', 'global')
+                ->where('calculated_at', '>=', Carbon::now()->subDays(7))
+                ->orderBy('calculated_at')
+                ->get(['trajectory_score', 'direction', 'calculated_at'])
+                ->groupBy(fn ($r) => Carbon::parse($r->calculated_at)->format('Y-m-d'))
+                ->map(fn ($rows) => $rows->last())
+                ->values();
+        }
+
         return Inertia::render('Executive/ControlTower', [
             'hero'                 => $payload['hero'],
             'regions'              => $payload['regions'],
@@ -67,6 +96,11 @@ class ExecutiveControlTowerWebController extends Controller
             'recommendations'      => $recommendations,
             'influences'           => $influences,
             'actors'               => $actors,
+            'trajectory'           => [
+                'global'  => $trajectoryGlobal,
+                'regions' => $trajectoryRegions,
+                'trend'   => $trajectoryTrend,
+            ],
             'generated_at'         => now()->toIso8601String(),
         ]);
     }

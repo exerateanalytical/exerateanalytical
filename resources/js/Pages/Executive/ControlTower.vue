@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import AnalyticsLayout from '@/Layouts/AnalyticsLayout.vue';
 import ActionModal from '@/Components/Executive/ActionModal.vue';
 import ScenarioModal from '@/Components/Executive/ScenarioModal.vue';
@@ -15,6 +15,7 @@ const props = defineProps({
     recommendations:      { type: Array,  default: () => [] },
     influences:           { type: Array,  default: () => [] },
     actors:               { type: Array,  default: () => [] },
+    trajectory:           { type: Object, default: null },
     generated_at:         { type: String, default: null },
 });
 
@@ -28,6 +29,7 @@ const representationIndex = ref(props.representation_index);
 const recommendations     = ref(props.recommendations);
 const influences          = ref(props.influences);
 const actors              = ref(props.actors);
+const trajectory          = ref(props.trajectory);
 const generatedAt         = ref(props.generated_at);
 const refreshing          = ref(false);
 const refreshError        = ref(null);
@@ -63,11 +65,12 @@ async function refresh() {
     refreshing.value   = true;
     refreshError.value = null;
     try {
-        const [ctRes, recRes, infRes, actorRes] = await Promise.all([
+        const [ctRes, recRes, infRes, actorRes, trajRes] = await Promise.all([
             axios.get('/api/v1/executive/control-tower'),
             axios.get('/api/v1/executive/recommendations'),
             axios.get('/api/v1/executive/influences'),
             axios.get('/api/v1/executive/actors/influence').catch(() => ({ data: { data: [] } })),
+            axios.get('/api/v1/executive/trajectory'),
         ]);
         const d = ctRes.data.data ?? {};
         hero.value                = d.hero                 ?? null;
@@ -80,6 +83,7 @@ async function refresh() {
         recommendations.value     = recRes.data.data ?? [];
         influences.value          = infRes.data.data ?? [];
         actors.value              = actorRes.data.data ?? [];
+        trajectory.value          = trajRes.data ?? null;
     } catch {
         refreshError.value = 'Refresh failed. Data may be stale.';
     } finally {
@@ -220,6 +224,69 @@ const actorBarCls = (score) => {
     if (score >= 30) return 'bg-amber-400';
     return 'bg-emerald-500';
 };
+
+// ── Governance Trajectory (CT-9) ──────────────────────────────────────────────
+const DIRECTION_META = {
+    improving: {
+        label:  'Improving',
+        icon:   '▲',
+        cls:    'text-emerald-600',
+        border: 'border-emerald-200 bg-emerald-50',
+        stroke: '#10b981',
+        badge:  'bg-emerald-100 text-emerald-700 border-emerald-200',
+    },
+    stable: {
+        label:  'Stable',
+        icon:   '■',
+        cls:    'text-gray-500',
+        border: 'border-gray-200 bg-gray-50',
+        stroke: '#9ca3af',
+        badge:  'bg-gray-100 text-gray-600 border-gray-200',
+    },
+    declining: {
+        label:  'Declining',
+        icon:   '▼',
+        cls:    'text-red-600',
+        border: 'border-red-200 bg-red-50',
+        stroke: '#ef4444',
+        badge:  'bg-red-100 text-red-700 border-red-200',
+    },
+};
+
+const trajGlobal    = computed(() => trajectory.value?.global   ?? null);
+const trajTrend     = computed(() => trajectory.value?.trend    ?? []);
+const trajDirection = computed(() => trajGlobal.value?.direction ?? 'stable');
+const trajMeta      = computed(() => DIRECTION_META[trajDirection.value] ?? DIRECTION_META.stable);
+
+const fmtTrajDelta = (val) => {
+    const v = parseFloat(val);
+    if (isNaN(v)) return '—';
+    return (v >= 0 ? '+' : '') + v.toFixed(1);
+};
+
+const deltaCls = (val, invert = false) => {
+    const v = parseFloat(val);
+    if (isNaN(v) || v === 0) return 'text-gray-400';
+    const positive = invert ? v < 0 : v > 0;
+    return positive ? 'text-emerald-600' : 'text-red-500';
+};
+
+// SVG sparkline polyline points — min-max normalised within the trend window.
+const sparklinePoints = computed(() => {
+    const data = trajTrend.value;
+    if (!data || data.length < 2) return '';
+
+    const scores = data.map(d => parseFloat(d.trajectory_score ?? 0));
+    const min    = Math.min(...scores);
+    const max    = Math.max(...scores);
+    const range  = Math.max(0.1, max - min);
+
+    return scores.map((s, i) => {
+        const x = 10 + (i / (scores.length - 1)) * 80;
+        const y = 35 - ((s - min) / range) * 26;   // y: 9 (top) → 35 (bottom)
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+});
 
 // ── Display helpers ───────────────────────────────────────────────────────────
 const stabilityBorder = (val) => {
@@ -365,6 +432,115 @@ const pct = (v, decimals = 1) =>
 
         <!-- ── Page body ───────────────────────────────────────────────────── -->
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+            <!-- ── 0. GOVERNANCE TRAJECTORY RIBBON ────────────────────────── -->
+            <div :class="['rounded-xl border shadow-sm px-6 py-4 transition', trajMeta.border]">
+                <div class="flex items-center justify-between gap-6 flex-wrap">
+
+                    <!-- Direction + label + score -->
+                    <div class="flex items-center gap-5">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                                Governance Trajectory
+                            </p>
+                            <div class="flex items-center gap-2">
+                                <span :class="['text-3xl font-bold leading-none tabular-nums', trajMeta.cls]">
+                                    {{ trajMeta.icon }}
+                                </span>
+                                <span :class="['text-xl font-bold', trajMeta.cls]">
+                                    {{ trajMeta.label }}
+                                </span>
+                                <span v-if="!trajGlobal" class="text-sm text-gray-400 ml-1">
+                                    — no data yet
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Trajectory score -->
+                        <div v-if="trajGlobal" class="border-l border-gray-200 pl-5">
+                            <p class="text-xs text-gray-400 mb-0.5">Score</p>
+                            <p :class="['text-2xl font-extrabold tabular-nums leading-none', trajMeta.cls]">
+                                {{ fmtTrajDelta(trajGlobal.trajectory_score) }}
+                            </p>
+                            <p class="text-xs text-gray-400 mt-0.5">out of ±100</p>
+                        </div>
+                    </div>
+
+                    <!-- Component deltas -->
+                    <div v-if="trajGlobal" class="flex flex-wrap items-center gap-2">
+                        <span class="text-xs text-gray-400 mr-1 hidden sm:block">Δ signals:</span>
+
+                        <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border bg-white border-gray-200">
+                            <span class="text-gray-400">Stability</span>
+                            <span :class="deltaCls(trajGlobal.stability_delta)">
+                                {{ fmtTrajDelta(trajGlobal.stability_delta) }}
+                            </span>
+                        </span>
+
+                        <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border bg-white border-gray-200">
+                            <span class="text-gray-400">Trust</span>
+                            <span :class="deltaCls(trajGlobal.trust_delta)">
+                                {{ fmtTrajDelta(trajGlobal.trust_delta) }}
+                            </span>
+                        </span>
+
+                        <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border bg-white border-gray-200">
+                            <span class="text-gray-400">Participation</span>
+                            <span :class="deltaCls(trajGlobal.participation_delta)">
+                                {{ fmtTrajDelta(trajGlobal.participation_delta) }}
+                            </span>
+                        </span>
+
+                        <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border bg-white border-gray-200">
+                            <span class="text-gray-400">Contagion</span>
+                            <!-- contagion positive = bad, so invert colour -->
+                            <span :class="deltaCls(trajGlobal.contagion_delta, true)">
+                                {{ fmtTrajDelta(trajGlobal.contagion_delta) }}
+                            </span>
+                        </span>
+                    </div>
+
+                    <!-- 7-day mini sparkline -->
+                    <div class="shrink-0">
+                        <p class="text-xs text-gray-400 mb-1 text-right">7-day trend</p>
+                        <div class="w-36 h-10">
+                            <svg
+                                viewBox="0 0 100 44"
+                                class="w-full h-full overflow-visible"
+                                aria-hidden="true"
+                            >
+                                <!-- Zero reference line -->
+                                <line
+                                    x1="8" y1="22" x2="92" y2="22"
+                                    :stroke="trajMeta.stroke"
+                                    stroke-width="0.5"
+                                    stroke-dasharray="2 2"
+                                    opacity="0.35"
+                                />
+                                <!-- Trend polyline -->
+                                <polyline
+                                    v-if="sparklinePoints"
+                                    :points="sparklinePoints"
+                                    fill="none"
+                                    :stroke="trajMeta.stroke"
+                                    stroke-width="2"
+                                    stroke-linejoin="round"
+                                    stroke-linecap="round"
+                                />
+                                <!-- No-data placeholder -->
+                                <text
+                                    v-else
+                                    x="50" y="25"
+                                    text-anchor="middle"
+                                    font-size="7"
+                                    fill="#9ca3af"
+                                >no history</text>
+                            </svg>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
 
             <!-- ── A. HERO SIGNALS ─────────────────────────────────────────── -->
             <section>

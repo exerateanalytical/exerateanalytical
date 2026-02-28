@@ -31,3 +31,6 @@ Schedule::command('governance:compute-influences')->everyTenMinutes();
 
 // CT-8 Institutional & Actor Intelligence Layer — every 30 minutes
 Schedule::command('governance:compute-institutional-influences')->everyThirtyMinutes();
+
+// CT-9 Governance Trajectory Engine — every 15 minutes
+Schedule::command('governance:compute-trajectories')->everyFifteenMinutes();
