@@ -425,6 +425,74 @@ const radarVelocityClass = (v) => {
     if (v == null || (v >= -0.1 && v <= 0.1)) return 'text-gray-400';
     return v > 0 ? 'text-emerald-600' : 'text-red-500';
 };
+
+// ── CT-12 Civic Causality Explanation Drawer ──────────────────────────────────
+const explanationPriority = ref(null);
+const explanationData     = ref(null);
+const explanationLoading  = ref(false);
+const explanationError    = ref(null);
+
+async function openExplanationDrawer(item) {
+    explanationPriority.value = item;
+    explanationData.value     = null;
+    explanationError.value    = null;
+    explanationLoading.value  = true;
+    try {
+        const res = await axios.get(`/api/v1/executive/civic-priorities/${item.id}/explanation`);
+        explanationData.value = res.data.data ?? null;
+    } catch (err) {
+        explanationError.value = err?.response?.status === 404
+            ? 'No explanation generated yet for this signal.'
+            : 'Failed to load explanation. Please try again.';
+    } finally {
+        explanationLoading.value = false;
+    }
+}
+
+function closeExplanationDrawer() {
+    explanationPriority.value = null;
+    explanationData.value     = null;
+    explanationError.value    = null;
+}
+
+const DRIVER_LABELS = {
+    participation_velocity: 'Participation Momentum',
+    trust_delta:            'Trust Dynamics',
+    contagion_pressure:     'Risk Contagion Pressure',
+    representation_gap:     'Representation Gap',
+};
+
+const RISK_META = {
+    critical: { label: 'Critical', cls: 'bg-red-100 text-red-700 border-red-200' },
+    high:     { label: 'High',     cls: 'bg-orange-100 text-orange-700 border-orange-200' },
+    medium:   { label: 'Medium',   cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+    low:      { label: 'Low',      cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+};
+
+const TRAJ_META = {
+    improving:    { arrow: '↑', label: 'Improving',    cls: 'text-emerald-600' },
+    stable:       { arrow: '→', label: 'Stable',       cls: 'text-gray-500' },
+    deteriorating:{ arrow: '↓', label: 'Deteriorating',cls: 'text-red-600' },
+};
+
+const riskMeta = (r) => RISK_META[r] ?? RISK_META.low;
+const trajMeta = (d) => TRAJ_META[d] ?? TRAJ_META.stable;
+
+// Normalise a raw driver value to 0-100 for bar display (mirrors service logic)
+const normalizeDriver = (key, value) => {
+    if (value == null) return 0;
+    if (key === 'participation_velocity' || key === 'trust_delta') {
+        return Math.min(Math.abs(value), 5.0) / 5.0 * 100;
+    }
+    return Math.min(Math.max(value, 0), 100);
+};
+
+const driverBarCls = (key, isPrimary) => {
+    if (isPrimary) return 'bg-indigo-500';
+    if (key === 'contagion_pressure') return 'bg-red-400';
+    if (key === 'trust_delta')        return 'bg-amber-400';
+    return 'bg-blue-400';
+};
 </script>
 
 <template>
@@ -1050,6 +1118,7 @@ const radarVelocityClass = (v) => {
                                     <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Priority</th>
                                     <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Velocity</th>
                                     <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Region</th>
+                                    <th class="px-4 py-3"></th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
@@ -1098,6 +1167,16 @@ const radarVelocityClass = (v) => {
                                     <!-- Region -->
                                     <td class="px-4 py-3 text-xs text-gray-500">
                                         {{ item.signal_region ?? 'Global' }}
+                                    </td>
+
+                                    <!-- Explain -->
+                                    <td class="px-4 py-3 text-right">
+                                        <button
+                                            @click="openExplanationDrawer(item)"
+                                            class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition"
+                                        >
+                                            Explain
+                                        </button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -1545,6 +1624,162 @@ const radarVelocityClass = (v) => {
                             <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Computed At</p>
                             <p class="text-sm text-gray-600">{{ fmt(selectedActor.calculated_at) }}</p>
                         </div>
+
+                    </div>
+                </aside>
+            </Transition>
+        </Teleport>
+
+        <!-- ── CT-12 Causality Explanation Drawer ────────────────────── -->
+        <Teleport to="body">
+            <Transition
+                enter-from-class="opacity-0"
+                enter-active-class="transition duration-150 ease-out"
+                enter-to-class="opacity-100"
+                leave-from-class="opacity-100"
+                leave-active-class="transition duration-150 ease-in"
+                leave-to-class="opacity-0"
+            >
+                <div
+                    v-if="explanationPriority"
+                    class="fixed inset-0 z-40 bg-black/30"
+                    @click="closeExplanationDrawer"
+                />
+            </Transition>
+
+            <Transition
+                enter-from-class="translate-x-full"
+                enter-active-class="transition duration-200 ease-out"
+                enter-to-class="translate-x-0"
+                leave-from-class="translate-x-0"
+                leave-active-class="transition duration-150 ease-in"
+                leave-to-class="translate-x-full"
+            >
+                <aside
+                    v-if="explanationPriority"
+                    class="fixed right-0 top-0 h-full w-full max-w-lg bg-white shadow-2xl z-50 flex flex-col overflow-y-auto"
+                >
+                    <!-- Header -->
+                    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200 shrink-0">
+                        <div>
+                            <p class="text-xs font-semibold text-indigo-500 uppercase tracking-wider mb-0.5">Causality Engine · CT-12</p>
+                            <h3 class="text-base font-bold text-gray-900 truncate max-w-xs" :title="explanationPriority.signal_title ?? undefined">
+                                {{ explanationPriority.signal_title ?? 'Signal Explanation' }}
+                            </h3>
+                        </div>
+                        <button
+                            @click="closeExplanationDrawer"
+                            class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition shrink-0 ml-3"
+                            aria-label="Close"
+                        >
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="flex-1 px-6 py-6 space-y-6">
+
+                        <!-- Loading state -->
+                        <div v-if="explanationLoading" class="flex items-center justify-center py-12">
+                            <svg class="animate-spin w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                            </svg>
+                            <span class="ml-3 text-sm text-gray-500">Loading explanation…</span>
+                        </div>
+
+                        <!-- Error state -->
+                        <div v-else-if="explanationError" class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+                            {{ explanationError }}
+                        </div>
+
+                        <!-- Data -->
+                        <template v-else-if="explanationData">
+
+                            <!-- Primary Driver -->
+                            <div>
+                                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Primary Driver</p>
+                                <div class="flex items-center gap-3">
+                                    <span class="inline-block text-sm font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-full">
+                                        {{ DRIVER_LABELS[explanationData.primary_driver] ?? explanationData.primary_driver }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Driver Breakdown bars -->
+                            <div>
+                                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Driver Breakdown</p>
+                                <div class="space-y-3">
+                                    <div
+                                        v-for="(rawVal, key) in explanationData.driver_breakdown"
+                                        :key="key"
+                                    >
+                                        <div class="flex items-center justify-between mb-1">
+                                            <span :class="['text-xs font-semibold', key === explanationData.primary_driver ? 'text-indigo-700' : 'text-gray-600']">
+                                                {{ DRIVER_LABELS[key] ?? key }}
+                                                <span v-if="key === explanationData.primary_driver" class="ml-1 text-indigo-400 font-normal">· primary</span>
+                                            </span>
+                                            <span class="text-xs font-mono text-gray-500">{{ Number(rawVal).toFixed(3) }}</span>
+                                        </div>
+                                        <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                            <div
+                                                :class="['h-full rounded-full transition-all duration-500', driverBarCls(key, key === explanationData.primary_driver)]"
+                                                :style="{ width: `${normalizeDriver(key, rawVal).toFixed(1)}%` }"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Trajectory direction -->
+                            <div class="flex items-center gap-4">
+                                <div class="flex-1">
+                                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Governance Trajectory</p>
+                                    <p :class="['text-lg font-extrabold', trajMeta(explanationData.trajectory_direction).cls]">
+                                        {{ trajMeta(explanationData.trajectory_direction).arrow }}
+                                        {{ trajMeta(explanationData.trajectory_direction).label }}
+                                    </p>
+                                </div>
+
+                                <!-- Risk projection badge -->
+                                <div class="text-right">
+                                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Projected Risk</p>
+                                    <span :class="['inline-block text-sm font-bold px-3 py-1.5 rounded-full border', riskMeta(explanationData.projected_risk_level).cls]">
+                                        {{ riskMeta(explanationData.projected_risk_level).label }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Affected regions -->
+                            <div v-if="explanationData.affected_regions?.length">
+                                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Affected Regions</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <span
+                                        v-for="region in explanationData.affected_regions"
+                                        :key="region.code ?? region.name"
+                                        class="text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200 px-2.5 py-1 rounded-full"
+                                        :title="region.name"
+                                    >
+                                        {{ region.code ?? region.name }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Explanation summary -->
+                            <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+                                <p class="text-xs font-semibold text-indigo-500 uppercase tracking-wider mb-2">Explanation Summary</p>
+                                <p class="text-sm text-gray-700 leading-relaxed">{{ explanationData.explanation_summary }}</p>
+                            </div>
+
+                            <!-- Generated at -->
+                            <div>
+                                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Generated At</p>
+                                <p class="text-sm text-gray-600">{{ fmt(explanationData.created_at) }}</p>
+                            </div>
+
+                        </template>
 
                     </div>
                 </aside>

@@ -35,5 +35,7 @@ Schedule::command('governance:compute-institutional-influences')->everyThirtyMin
 // CT-9 Governance Trajectory Engine — every 15 minutes
 Schedule::command('governance:compute-trajectories')->everyFifteenMinutes();
 
-// CT-11 Civic Signal Prioritization Engine — every 15 minutes
-Schedule::command('civic:compute-signal-priorities')->everyFifteenMinutes();
+// CT-11 + CT-12 Civic Signal Prioritization & Causality Engine — every 15 minutes
+Schedule::command('civic:compute-signal-priorities')
+    ->everyFifteenMinutes()
+    ->after(fn () => Artisan::call('civic:generate-signal-explanations'));
