@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\ExecutiveBriefController;
 use App\Http\Controllers\Api\V1\ExecutiveControlTowerController;
 use App\Http\Controllers\Api\V1\ExecutiveGovernanceMetricsController;
 use App\Http\Controllers\Api\V1\GovernanceActionController;
+use App\Http\Controllers\Api\V1\GovernanceActionOutcomeController;
 use App\Http\Controllers\Api\V1\GovernanceDecisionRankingController;
 use App\Http\Controllers\Api\V1\GovernanceInfluenceController;
 use App\Http\Controllers\Api\V1\GovernanceRecommendationController;
@@ -116,6 +117,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/executive/recommendations/{recommendation}/decisions', [GovernanceDecisionRankingController::class, 'index'])
             ->whereUuid('recommendation')
             ->name('executive.recommendations.decisions');
+        // CT-14 Governance Memory Engine — action effectiveness history
+        Route::get('/executive/actions/{action}/outcomes', [GovernanceActionOutcomeController::class, 'index'])
+            ->whereUuid('action')
+            ->name('executive.actions.outcomes');
         Route::get('/executive/influences', [GovernanceInfluenceController::class, 'index'])
             ->name('executive.influences');
         Route::get('/executive/trajectory', [GovernanceTrajectoryController::class, 'index'])

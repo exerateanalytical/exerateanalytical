@@ -37,6 +37,9 @@ Schedule::command('governance:compute-institutional-influences')->everyThirtyMin
 // CT-9 Governance Trajectory Engine — every 15 minutes
 Schedule::command('governance:compute-trajectories')->everyFifteenMinutes();
 
+// CT-14 Governance Memory Engine — measure action outcomes every hour
+Schedule::command('governance:measure-outcomes')->hourly();
+
 // CT-11 + CT-12 Civic Signal Prioritization & Causality Engine — every 15 minutes
 Schedule::command('civic:compute-signal-priorities')
     ->everyFifteenMinutes()
