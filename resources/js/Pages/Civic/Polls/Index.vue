@@ -36,13 +36,19 @@ const formatDate = (iso) => iso
                     <h1 class="text-2xl font-bold text-gray-900">Polls</h1>
                     <p class="text-sm text-gray-500 mt-0.5">Community polls across the federation.</p>
                 </div>
-                <Link
-                    v-if="$page.props.auth?.user"
-                    :href="route('civic.polls.create')"
-                    class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition shadow-sm"
-                >
-                    + Create Poll
-                </Link>
+                <div class="flex items-center gap-3">
+                    <a :href="route('civic.polls.templates')"
+                        class="text-sm text-blue-600 hover:text-blue-800 font-medium transition">
+                        Browse templates
+                    </a>
+                    <Link
+                        v-if="$page.props.auth?.user"
+                        :href="route('civic.polls.create')"
+                        class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition shadow-sm"
+                    >
+                        + Create Poll
+                    </Link>
+                </div>
             </div>
         </template>
 

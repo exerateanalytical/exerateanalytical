@@ -36,13 +36,19 @@ const formatDate = (iso) => iso
                     <h1 class="text-2xl font-bold text-gray-900">Petitions</h1>
                     <p class="text-sm text-gray-500 mt-0.5">Civic petitions open for signatures.</p>
                 </div>
-                <Link
-                    v-if="$page.props.auth?.user"
-                    :href="route('civic.petitions.create')"
-                    class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition shadow-sm"
-                >
-                    + Create Petition
-                </Link>
+                <div class="flex items-center gap-3">
+                    <a :href="route('civic.petitions.templates')"
+                        class="text-sm text-emerald-600 hover:text-emerald-800 font-medium transition">
+                        Browse templates
+                    </a>
+                    <Link
+                        v-if="$page.props.auth?.user"
+                        :href="route('civic.petitions.create')"
+                        class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition shadow-sm"
+                    >
+                        + Create Petition
+                    </Link>
+                </div>
             </div>
         </template>
 

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Country;
+use App\Models\PetitionTemplate;
+use App\Models\PollTemplate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -144,5 +146,25 @@ class AdminWebController extends Controller
             $recentRuns = collect();
         }
         return Inertia::render('Admin/RiskContagion', compact('regions', 'recentRuns'));
+    }
+
+    public function pollTemplates(): Response
+    {
+        try {
+            $templates = PollTemplate::orderBy('sort_order')->orderBy('title')->get();
+        } catch (\Throwable $e) {
+            $templates = collect();
+        }
+        return Inertia::render('Admin/PollTemplates', ['templates' => $templates]);
+    }
+
+    public function petitionTemplates(): Response
+    {
+        try {
+            $templates = PetitionTemplate::orderBy('sort_order')->orderBy('title')->get();
+        } catch (\Throwable $e) {
+            $templates = collect();
+        }
+        return Inertia::render('Admin/PetitionTemplates', ['templates' => $templates]);
     }
 }

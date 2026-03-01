@@ -53,6 +53,15 @@ const useTemplate = () => {
 
 <template>
     <Teleport to="body">
+        <!-- Overlay fade transition -->
+        <Transition
+            enter-active-class="transition ease-out duration-200"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition ease-in duration-150"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
         <div
             v-if="template"
             class="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -61,7 +70,13 @@ const useTemplate = () => {
             <!-- Backdrop -->
             <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" @click="onClose" />
 
-            <!-- Panel -->
+            <!-- Panel slide-up transition (appear runs on mount inside v-if) -->
+            <Transition
+                appear
+                enter-active-class="transition ease-out duration-200"
+                enter-from-class="opacity-0 translate-y-4 scale-95"
+                enter-to-class="opacity-100 translate-y-0 scale-100"
+            >
             <div class="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
                 <!-- Header -->
@@ -157,6 +172,8 @@ const useTemplate = () => {
                     </button>
                 </div>
             </div>
+            </Transition>
         </div>
+        </Transition>
     </Teleport>
 </template>

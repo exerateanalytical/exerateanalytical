@@ -139,4 +139,6 @@ Route::prefix('admin')->name('admin.')->middleware([
     Route::get('/exposure-matrix',              [AdminWebController::class, 'exposureMatrix'])->name('exposure-matrix');
     Route::get('/alert-subscriptions',          [AdminWebController::class, 'alertSubscriptions'])->name('alert-subscriptions');
     Route::get('/risk-contagion',               [AdminWebController::class, 'riskContagion'])->name('risk-contagion');
+    Route::get('/poll-templates',               [AdminWebController::class, 'pollTemplates'])->name('poll-templates');
+    Route::get('/petition-templates',           [AdminWebController::class, 'petitionTemplates'])->name('petition-templates');
 });
