@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\ExecutiveControlTowerController;
 use App\Http\Controllers\Api\V1\ExecutiveGovernanceMetricsController;
 use App\Http\Controllers\Api\V1\GovernanceActionController;
 use App\Http\Controllers\Api\V1\GovernanceActionOutcomeController;
+use App\Http\Controllers\Api\V1\GovernanceAssignmentController;
 use App\Http\Controllers\Api\V1\GovernanceDecisionRankingController;
 use App\Http\Controllers\Api\V1\GovernanceInfluenceController;
 use App\Http\Controllers\Api\V1\GovernanceRecommendationController;
@@ -121,6 +122,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/executive/actions/{action}/outcomes', [GovernanceActionOutcomeController::class, 'index'])
             ->whereUuid('action')
             ->name('executive.actions.outcomes');
+        // CT-15 Institutional Coordination Engine — dashboard read
+        Route::get('/executive/assignments', [GovernanceAssignmentController::class, 'index'])
+            ->name('executive.assignments');
         Route::get('/executive/influences', [GovernanceInfluenceController::class, 'index'])
             ->name('executive.influences');
         Route::get('/executive/trajectory', [GovernanceTrajectoryController::class, 'index'])
@@ -251,6 +255,23 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::patch('/governance/actions/{action}/reject', [GovernanceActionController::class, 'reject'])
                 ->whereUuid('action')
                 ->name('governance.actions.reject');
+
+            // CT-15 Institutional Coordination Engine — assignment mutations
+            Route::post('/governance/actions/{action}/assign', [GovernanceAssignmentController::class, 'assign'])
+                ->whereUuid('action')
+                ->name('governance.actions.assign');
+
+            Route::patch('/governance/assignments/{assignment}/acknowledge', [GovernanceAssignmentController::class, 'acknowledge'])
+                ->whereUuid('assignment')
+                ->name('governance.assignments.acknowledge');
+
+            Route::patch('/governance/assignments/{assignment}/progress', [GovernanceAssignmentController::class, 'progress'])
+                ->whereUuid('assignment')
+                ->name('governance.assignments.progress');
+
+            Route::patch('/governance/assignments/{assignment}/complete', [GovernanceAssignmentController::class, 'complete'])
+                ->whereUuid('assignment')
+                ->name('governance.assignments.complete');
         });
 
     // ─── Civic Participation Routes ─────────────────────────────────────────

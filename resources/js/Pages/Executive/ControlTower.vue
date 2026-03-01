@@ -17,6 +17,7 @@ const props = defineProps({
     actors:               { type: Array,  default: () => [] },
     trajectory:           { type: Object, default: null },
     civic_priorities:     { type: Array,  default: () => [] },
+    assignments:          { type: Array,  default: () => [] },
     generated_at:         { type: String, default: null },
 });
 
@@ -32,6 +33,7 @@ const influences          = ref(props.influences);
 const actors              = ref(props.actors);
 const trajectory          = ref(props.trajectory);
 const civicPriorities     = ref(props.civic_priorities);
+const assignments         = ref(props.assignments);
 const generatedAt         = ref(props.generated_at);
 const refreshing          = ref(false);
 const refreshError        = ref(null);
@@ -67,13 +69,14 @@ async function refresh() {
     refreshing.value   = true;
     refreshError.value = null;
     try {
-        const [ctRes, recRes, infRes, actorRes, trajRes, prioRes] = await Promise.all([
+        const [ctRes, recRes, infRes, actorRes, trajRes, prioRes, assignRes] = await Promise.all([
             axios.get('/api/v1/executive/control-tower'),
             axios.get('/api/v1/executive/recommendations'),
             axios.get('/api/v1/executive/influences'),
             axios.get('/api/v1/executive/actors/influence').catch(() => ({ data: { data: [] } })),
             axios.get('/api/v1/executive/trajectory'),
             axios.get('/api/v1/executive/civic-priorities').catch(() => ({ data: { data: [] } })),
+            axios.get('/api/v1/executive/assignments').catch(() => ({ data: { data: [] } })),
         ]);
         const d = ctRes.data.data ?? {};
         hero.value                = d.hero                 ?? null;
@@ -87,7 +90,8 @@ async function refresh() {
         influences.value          = infRes.data.data ?? [];
         actors.value              = actorRes.data.data ?? [];
         trajectory.value          = trajRes.data ?? null;
-        civicPriorities.value     = prioRes.data.data ?? [];
+        civicPriorities.value     = prioRes.data.data   ?? [];
+        assignments.value         = assignRes.data.data ?? [];
     } catch {
         refreshError.value = 'Refresh failed. Data may be stale.';
     } finally {
@@ -493,6 +497,24 @@ const driverBarCls = (key, isPrimary) => {
     if (key === 'trust_delta')        return 'bg-amber-400';
     return 'bg-blue-400';
 };
+
+// ── CT-15 Execution Status helpers ────────────────────────────────────────────
+const ASSIGNMENT_STATUS_META = {
+    assigned:     { label: 'Assigned',     cls: 'bg-gray-100    text-gray-600    border-gray-200',    bar: 'bg-gray-400'    },
+    acknowledged: { label: 'Acknowledged', cls: 'bg-blue-100    text-blue-700    border-blue-200',    bar: 'bg-blue-400'    },
+    in_progress:  { label: 'In Progress',  cls: 'bg-amber-100   text-amber-700   border-amber-200',   bar: 'bg-amber-400'   },
+    completed:    { label: 'Completed',    cls: 'bg-emerald-100 text-emerald-700 border-emerald-200',  bar: 'bg-emerald-500'  },
+    blocked:      { label: 'Blocked',      cls: 'bg-red-100     text-red-700     border-red-200',      bar: 'bg-red-500'      },
+};
+
+const assignmentMeta  = (s) => ASSIGNMENT_STATUS_META[s] ?? ASSIGNMENT_STATUS_META.assigned;
+const assignmentCls   = (s) => assignmentMeta(s).cls;
+const assignmentLabel = (s) => assignmentMeta(s).label;
+const assignmentBar   = (s) => assignmentMeta(s).bar;
+
+// Last meaningful timestamp for the "Last Update" column
+const assignmentLastUpdate = (a) =>
+    a.completed_at ?? a.acknowledged_at ?? a.created_at;
 </script>
 
 <template>
@@ -1185,6 +1207,87 @@ const driverBarCls = (key, isPrimary) => {
                     <div v-else class="px-6 py-10 text-center text-gray-400 text-sm">
                         <p class="font-medium">No priority signals computed yet.</p>
                         <p class="text-xs mt-1">Signals are scored every 15 minutes once the scheduler runs.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── J. EXECUTION STATUS (CT-15) ──────────────────────────── -->
+            <section>
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Execution Status
+                    </h2>
+                    <span class="text-xs text-gray-400">Institutional coordination · live tracking</span>
+                </div>
+
+                <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div v-if="assignments.length" class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Institution</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">Progress</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Update</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <tr
+                                    v-for="asgn in assignments"
+                                    :key="asgn.id"
+                                    class="hover:bg-gray-50 transition"
+                                >
+                                    <!-- Institution -->
+                                    <td class="px-4 py-3 font-medium text-gray-900 max-w-[180px]">
+                                        <span class="block truncate" :title="asgn.institution_name">
+                                            {{ asgn.institution_name }}
+                                        </span>
+                                    </td>
+
+                                    <!-- Action type -->
+                                    <td class="px-4 py-3">
+                                        <span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded capitalize">
+                                            {{ (asgn.action_type ?? '—').replace(/_/g, ' ') }}
+                                        </span>
+                                    </td>
+
+                                    <!-- Status badge -->
+                                    <td class="px-4 py-3">
+                                        <span :class="['text-xs font-semibold px-2.5 py-1 rounded-full border', assignmentCls(asgn.status)]">
+                                            {{ assignmentLabel(asgn.status) }}
+                                        </span>
+                                    </td>
+
+                                    <!-- Progress bar -->
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <div class="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden min-w-[56px]">
+                                                <div
+                                                    :class="['h-full rounded-full transition-all duration-500', assignmentBar(asgn.status)]"
+                                                    :style="{ width: `${asgn.progress_percent ?? 0}%` }"
+                                                />
+                                            </div>
+                                            <span class="text-xs tabular-nums text-gray-500 shrink-0 w-8 text-right">
+                                                {{ asgn.progress_percent ?? 0 }}%
+                                            </span>
+                                        </div>
+                                    </td>
+
+                                    <!-- Last update timestamp -->
+                                    <td class="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
+                                        {{ fmt(assignmentLastUpdate(asgn)) }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div v-else class="px-6 py-10 text-center text-gray-400 text-sm">
+                        <p class="font-medium">No institutional assignments yet.</p>
+                        <p class="text-xs mt-1">
+                            Assignments appear here when governance actions are delegated via
+                            <span class="font-mono text-gray-500">POST /api/v1/internal/governance/actions/{'{action}'}/assign</span>.
+                        </p>
                     </div>
                 </div>
             </section>

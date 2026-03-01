@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\CivicSignalPriority;
+use App\Models\GovernanceAssignment;
 use App\Models\GovernanceInfluence;
 use App\Models\GovernanceRecommendation;
 use App\Models\GovernanceTrajectory;
@@ -100,6 +101,22 @@ class ExecutiveControlTowerWebController extends Controller
             $priorityService->hydrateSignals($civicPriorities);
         }
 
+        // ── CT-15 Institutional Coordination — current assignments ────────────
+        $assignments = GovernanceAssignment::with([
+            'action:id,action_type',
+            'assignedBy:id,name',
+        ])
+        ->orderByRaw("CASE status
+            WHEN 'blocked'      THEN 1
+            WHEN 'in_progress'  THEN 2
+            WHEN 'assigned'     THEN 3
+            WHEN 'acknowledged' THEN 4
+            WHEN 'completed'    THEN 5
+            ELSE 6 END")
+        ->orderByDesc('created_at')
+        ->limit(50)
+        ->get();
+
         return Inertia::render('Executive/ControlTower', [
             'hero'                 => $payload['hero'],
             'regions'              => $payload['regions'],
@@ -116,6 +133,7 @@ class ExecutiveControlTowerWebController extends Controller
                 'trend'   => $trajectoryTrend,
             ],
             'civic_priorities'     => $civicPriorities,
+            'assignments'          => $assignments,
             'generated_at'         => now()->toIso8601String(),
         ]);
     }
