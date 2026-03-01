@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\CivicSignalPriority;
 use App\Models\GovernanceInfluence;
 use App\Models\GovernanceRecommendation;
 use App\Models\GovernanceTrajectory;
 use App\Models\InstitutionalInfluence;
+use App\Services\Civic\SignalPriorityService;
 use App\Services\Executive\ControlTowerService;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -21,7 +23,7 @@ class ExecutiveControlTowerWebController extends Controller
      * the same ControlTowerService used by the API endpoint. The Vue page can
      * refresh live via GET /api/v1/executive/control-tower.
      */
-    public function index(ControlTowerService $service): Response
+    public function index(ControlTowerService $service, SignalPriorityService $priorityService): Response
     {
         $payload = $service->build();
 
@@ -86,6 +88,18 @@ class ExecutiveControlTowerWebController extends Controller
                 ->values();
         }
 
+        // ── CT-11 Civic Signal Priorities ─────────────────────────────────────
+        $civicPriorities  = collect();
+        $latestPriorityAt = CivicSignalPriority::max('calculated_at');
+        if ($latestPriorityAt) {
+            $cutoff          = Carbon::parse($latestPriorityAt)->subSeconds(90);
+            $civicPriorities = CivicSignalPriority::where('calculated_at', '>=', $cutoff)
+                ->orderByDesc('priority_score')
+                ->limit(20)
+                ->get();
+            $priorityService->hydrateSignals($civicPriorities);
+        }
+
         return Inertia::render('Executive/ControlTower', [
             'hero'                 => $payload['hero'],
             'regions'              => $payload['regions'],
@@ -101,6 +115,7 @@ class ExecutiveControlTowerWebController extends Controller
                 'regions' => $trajectoryRegions,
                 'trend'   => $trajectoryTrend,
             ],
+            'civic_priorities'     => $civicPriorities,
             'generated_at'         => now()->toIso8601String(),
         ]);
     }

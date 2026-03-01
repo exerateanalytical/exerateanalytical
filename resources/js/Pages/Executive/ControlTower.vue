@@ -16,6 +16,7 @@ const props = defineProps({
     influences:           { type: Array,  default: () => [] },
     actors:               { type: Array,  default: () => [] },
     trajectory:           { type: Object, default: null },
+    civic_priorities:     { type: Array,  default: () => [] },
     generated_at:         { type: String, default: null },
 });
 
@@ -30,6 +31,7 @@ const recommendations     = ref(props.recommendations);
 const influences          = ref(props.influences);
 const actors              = ref(props.actors);
 const trajectory          = ref(props.trajectory);
+const civicPriorities     = ref(props.civic_priorities);
 const generatedAt         = ref(props.generated_at);
 const refreshing          = ref(false);
 const refreshError        = ref(null);
@@ -65,12 +67,13 @@ async function refresh() {
     refreshing.value   = true;
     refreshError.value = null;
     try {
-        const [ctRes, recRes, infRes, actorRes, trajRes] = await Promise.all([
+        const [ctRes, recRes, infRes, actorRes, trajRes, prioRes] = await Promise.all([
             axios.get('/api/v1/executive/control-tower'),
             axios.get('/api/v1/executive/recommendations'),
             axios.get('/api/v1/executive/influences'),
             axios.get('/api/v1/executive/actors/influence').catch(() => ({ data: { data: [] } })),
             axios.get('/api/v1/executive/trajectory'),
+            axios.get('/api/v1/executive/civic-priorities').catch(() => ({ data: { data: [] } })),
         ]);
         const d = ctRes.data.data ?? {};
         hero.value                = d.hero                 ?? null;
@@ -84,6 +87,7 @@ async function refresh() {
         influences.value          = infRes.data.data ?? [];
         actors.value              = actorRes.data.data ?? [];
         trajectory.value          = trajRes.data ?? null;
+        civicPriorities.value     = prioRes.data.data ?? [];
     } catch {
         refreshError.value = 'Refresh failed. Data may be stale.';
     } finally {
@@ -387,6 +391,40 @@ const fmt = (iso) => {
 
 const pct = (v, decimals = 1) =>
     v != null ? (v * 100).toFixed(decimals) + '%' : '—';
+
+// ── CT-11 Civic Priority Radar helpers ───────────────────────────────────────
+const priorityText = (score) => {
+    if (score == null) return 'text-gray-400';
+    if (score >= 60)   return 'text-red-600';
+    if (score >= 30)   return 'text-amber-600';
+    return 'text-emerald-600';
+};
+
+const priorityBar = (score) => {
+    if (score >= 60) return 'bg-red-500';
+    if (score >= 30) return 'bg-amber-400';
+    return 'bg-emerald-500';
+};
+
+const radarVelocityArrow = (v) => {
+    if (v == null) return '→';
+    if (v >  0.1)  return '↑';
+    if (v < -0.1)  return '↓';
+    return '→';
+};
+
+const radarVelocityLabel = (v) => {
+    if (v == null) return '—';
+    if (v >  0.5)  return 'Accelerating';
+    if (v >  0.1)  return 'Growing';
+    if (v < -0.1)  return 'Slowing';
+    return 'Stable';
+};
+
+const radarVelocityClass = (v) => {
+    if (v == null || (v >= -0.1 && v <= 0.1)) return 'text-gray-400';
+    return v > 0 ? 'text-emerald-600' : 'text-red-500';
+};
 </script>
 
 <template>
@@ -992,6 +1030,85 @@ const pct = (v, decimals = 1) =>
                     </div>
                 </section>
             </div>
+
+            <!-- ── I. CIVIC PRIORITY RADAR (CT-11) ───────────────────────── -->
+            <section>
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Civic Priority Radar
+                    </h2>
+                    <span class="text-xs text-gray-400">Top-20 signals · scored every 15 min</span>
+                </div>
+
+                <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div v-if="civicPriorities.length" class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Title</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Priority</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Velocity</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Region</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <tr
+                                    v-for="item in civicPriorities"
+                                    :key="item.id"
+                                    class="hover:bg-gray-50 transition"
+                                >
+                                    <!-- Title -->
+                                    <td class="px-4 py-3 font-medium text-gray-900 max-w-xs">
+                                        <span class="block truncate" :title="item.signal_title ?? undefined">
+                                            {{ item.signal_title ?? '—' }}
+                                        </span>
+                                    </td>
+
+                                    <!-- Type badge -->
+                                    <td class="px-4 py-3">
+                                        <span :class="['text-xs font-semibold px-2 py-0.5 rounded-full capitalize', itemTypeBadge(item.signal_type)]">
+                                            {{ item.signal_type }}
+                                        </span>
+                                    </td>
+
+                                    <!-- Priority score + mini bar -->
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <div class="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden shrink-0">
+                                                <div
+                                                    :class="['h-full rounded-full transition-all duration-500', priorityBar(item.priority_score)]"
+                                                    :style="{ width: `${Math.min(100, Math.max(0, item.priority_score ?? 0))}%` }"
+                                                />
+                                            </div>
+                                            <span :class="['font-bold tabular-nums text-sm w-10 text-right', priorityText(item.priority_score)]">
+                                                {{ item.priority_score != null ? Number(item.priority_score).toFixed(1) : '—' }}
+                                            </span>
+                                        </div>
+                                    </td>
+
+                                    <!-- Velocity indicator -->
+                                    <td class="px-4 py-3">
+                                        <span :class="['inline-flex items-center gap-1 text-xs font-semibold', radarVelocityClass(item.participation_velocity)]">
+                                            {{ radarVelocityArrow(item.participation_velocity) }}
+                                            {{ radarVelocityLabel(item.participation_velocity) }}
+                                        </span>
+                                    </td>
+
+                                    <!-- Region -->
+                                    <td class="px-4 py-3 text-xs text-gray-500">
+                                        {{ item.signal_region ?? 'Global' }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div v-else class="px-6 py-10 text-center text-gray-400 text-sm">
+                        <p class="font-medium">No priority signals computed yet.</p>
+                        <p class="text-xs mt-1">Signals are scored every 15 minutes once the scheduler runs.</p>
+                    </div>
+                </div>
+            </section>
 
             <!-- ── G. GOVERNANCE INFLUENCE MAP ────────────────────────────── -->
             <section>

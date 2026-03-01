@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\PetitionTemplateController;
 use App\Http\Controllers\Api\V1\PollTemplateController;
 use App\Http\Controllers\Api\V1\CivicController;
 use App\Http\Controllers\Api\V1\CivicFeedController;
+use App\Http\Controllers\Api\V1\CivicPrioritiesController;
 use App\Http\Controllers\Api\V1\PetitionController;
 use App\Http\Controllers\Api\V1\PolicyProposalController;
 use App\Http\Controllers\Api\V1\PollController;
@@ -113,6 +114,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             ->name('executive.influences');
         Route::get('/executive/trajectory', [GovernanceTrajectoryController::class, 'index'])
             ->name('executive.trajectory');
+
+        // CT-11 Civic Signal Prioritization Engine
+        Route::get('/executive/civic-priorities', [CivicPrioritiesController::class, 'index'])
+            ->name('executive.civic-priorities');
 
         // Federation aggregated snapshots
         Route::get('/federation/global', [FederationController::class, 'global'])->name('federation.global');
