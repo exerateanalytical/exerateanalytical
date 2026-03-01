@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FederationRegion;
 use App\Models\Petition;
 use App\Models\PetitionSignature;
+use App\Models\PetitionTemplate;
 use App\Models\Reaction;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -30,10 +31,16 @@ class PetitionWebController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $template = null;
+        if ($request->template_id) {
+            $template = PetitionTemplate::find($request->template_id);
+        }
+
         return Inertia::render('Civic/Petitions/Create', [
-            'regions' => FederationRegion::select('id', 'name', 'code')->orderBy('name')->get(),
+            'regions'  => FederationRegion::select('id', 'name', 'code')->orderBy('name')->get(),
+            'template' => $template,
         ]);
     }
 

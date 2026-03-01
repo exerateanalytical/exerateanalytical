@@ -1,9 +1,14 @@
 <script setup>
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import CivicLayout from '@/Layouts/CivicLayout.vue';
 
-defineProps({ regions: { type: Array, default: () => [] } });
+const props = defineProps({
+    regions:  { type: Array,  default: () => [] },
+    template: { type: Object, default: null },
+});
+
+const appliedTemplate = ref(props.template?.title ?? null);
 
 const form = reactive({
     title:          '',
@@ -13,6 +18,21 @@ const form = reactive({
     signature_goal: 100,
     deadline:       '',
 });
+
+// Pre-fill form from template on mount
+onMounted(() => {
+    if (props.template) {
+        form.title          = props.template.title ?? '';
+        form.summary        = props.template.summary_template ?? '';
+        form.body           = props.template.body_template ?? '';
+        form.signature_goal = props.template.default_signature_goal ?? 100;
+    }
+});
+
+const clearTemplate = () => {
+    appliedTemplate.value = null;
+    router.visit(route('civic.petitions.create'), { replace: true });
+};
 
 const errors  = ref({});
 const saving  = ref(false);
@@ -46,6 +66,27 @@ const submit = async () => {
         </template>
 
         <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+            <!-- Template applied banner -->
+            <div v-if="appliedTemplate"
+                class="mb-4 flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-lg px-4 py-3">
+                <span>
+                    <strong>Template applied:</strong> {{ appliedTemplate }}
+                </span>
+                <button type="button" @click="clearTemplate"
+                    class="text-emerald-500 hover:text-emerald-700 transition font-medium">
+                    × Clear
+                </button>
+            </div>
+
+            <!-- Browse templates link -->
+            <div v-else class="mb-4 text-right">
+                <a :href="route('civic.petitions.templates')"
+                    class="text-sm text-emerald-600 hover:text-emerald-800 font-medium transition">
+                    Browse templates →
+                </a>
+            </div>
+
             <form @submit.prevent="submit" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-6">
 
                 <div v-if="errors.general" class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">

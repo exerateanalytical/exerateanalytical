@@ -1,11 +1,14 @@
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import CivicLayout from '@/Layouts/CivicLayout.vue';
 
-defineProps({
-    regions: { type: Array, default: () => [] },
+const props = defineProps({
+    regions:  { type: Array,  default: () => [] },
+    template: { type: Object, default: null },
 });
+
+const appliedTemplate = ref(props.template?.title ?? null);
 
 const form = reactive({
     title:                '',
@@ -19,6 +22,25 @@ const form = reactive({
     allow_multiple_votes: false,
     verified_only:        false,
 });
+
+// Pre-fill form from template on mount
+onMounted(() => {
+    if (props.template) {
+        form.title                = props.template.title ?? '';
+        form.description          = props.template.description ?? '';
+        form.type                 = props.template.poll_type ?? 'standard';
+        form.options              = props.template.options?.length
+            ? props.template.options.map(o => o)
+            : ['', ''];
+        form.allow_multiple_votes = props.template.allow_multiple_votes ?? false;
+        form.verified_only        = props.template.verified_only ?? false;
+    }
+});
+
+const clearTemplate = () => {
+    appliedTemplate.value = null;
+    router.visit(route('civic.polls.create'), { replace: true });
+};
 
 const errors  = ref({});
 const saving  = ref(false);
@@ -58,6 +80,27 @@ const submit = async () => {
         </template>
 
         <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+            <!-- Template applied banner -->
+            <div v-if="appliedTemplate"
+                class="mb-4 flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 text-blue-700 text-sm rounded-lg px-4 py-3">
+                <span>
+                    <strong>Template applied:</strong> {{ appliedTemplate }}
+                </span>
+                <button type="button" @click="clearTemplate"
+                    class="text-blue-500 hover:text-blue-700 transition font-medium">
+                    × Clear
+                </button>
+            </div>
+
+            <!-- Browse templates link -->
+            <div v-else class="mb-4 text-right">
+                <a :href="route('civic.polls.templates')"
+                    class="text-sm text-blue-600 hover:text-blue-800 font-medium transition">
+                    Browse templates →
+                </a>
+            </div>
+
             <form @submit.prevent="submit" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-6">
 
                 <div v-if="errors.general" class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">

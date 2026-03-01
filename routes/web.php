@@ -8,8 +8,10 @@ use App\Http\Controllers\Web\ExecutiveControlTowerWebController;
 use App\Http\Controllers\Web\ExecutiveDashboardWebController;
 use App\Http\Controllers\Web\ExecutiveGovernanceActionWebController;
 use App\Http\Controllers\Web\FederationWebController;
+use App\Http\Controllers\Web\PetitionTemplateWebController;
 use App\Http\Controllers\Web\PetitionWebController;
 use App\Http\Controllers\Web\PolicyWebController;
+use App\Http\Controllers\Web\PollTemplateWebController;
 use App\Http\Controllers\Web\PollWebController;
 use App\Http\Controllers\Web\RiskDashboardWebController;
 use App\Http\Controllers\Web\TransparencyWebController;
@@ -47,6 +49,9 @@ Route::prefix('civic')->name('civic.')->group(function () {
     // Polls – list + detail (public)
     Route::get('/polls',       [PollWebController::class, 'index'])->name('polls.index');
 
+    // Polls – templates gallery (public, before /create and /{id} to prevent shadowing)
+    Route::get('/polls/templates', [PollTemplateWebController::class, 'index'])->name('polls.templates');
+
     // Polls – create (auth required)
     Route::get('/polls/create', [PollWebController::class, 'create'])
         ->middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])
@@ -59,6 +64,9 @@ Route::prefix('civic')->name('civic.')->group(function () {
 
     // Petitions – list (public)
     Route::get('/petitions', [PetitionWebController::class, 'index'])->name('petitions.index');
+
+    // Petitions – templates gallery (public, before /create and /{id})
+    Route::get('/petitions/templates', [PetitionTemplateWebController::class, 'index'])->name('petitions.templates');
 
     // Petitions – create (auth required)
     Route::get('/petitions/create', [PetitionWebController::class, 'create'])

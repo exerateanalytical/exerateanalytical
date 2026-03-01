@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\V1\AccountabilityController;
 use App\Http\Controllers\Api\V1\AlertSubscriptionController;
+use App\Http\Controllers\Api\V1\PetitionTemplateController;
+use App\Http\Controllers\Api\V1\PollTemplateController;
 use App\Http\Controllers\Api\V1\CivicController;
 use App\Http\Controllers\Api\V1\CivicFeedController;
 use App\Http\Controllers\Api\V1\PetitionController;
@@ -131,6 +133,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/publications/{country}/{year}', [TransparencyController::class, 'publications'])->name('transparency.publications');
         Route::get('/open-data/{country}/{module}/{year}', [TransparencyController::class, 'openData'])->name('transparency.open-data');
         Route::get('/disruptions/{country}', [TransparencyController::class, 'disruptions'])->name('transparency.disruptions');
+
+        // Poll & Petition Templates (public reads)
+        Route::get('/poll-templates',           [PollTemplateController::class, 'index'])->name('poll-templates.index');
+        Route::get('/poll-templates/{pollTemplate}', [PollTemplateController::class, 'show'])->whereUuid('pollTemplate')->name('poll-templates.show');
+        Route::get('/petition-templates',            [PetitionTemplateController::class, 'index'])->name('petition-templates.index');
+        Route::get('/petition-templates/{petitionTemplate}', [PetitionTemplateController::class, 'show'])->whereUuid('petitionTemplate')->name('petition-templates.show');
     });
 
     // ─── Authenticated Admin Routes ────────────────────────────────────────
@@ -191,6 +199,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         // Alert Subscription management (SuperAdmin only)
         Route::apiResource('alert-subscriptions', AlertSubscriptionController::class)
             ->whereUuid('alert_subscription');
+
+        // Poll & Petition Template management (SuperAdmin only — guards inside controller)
+        Route::post('/poll-templates',                      [PollTemplateController::class, 'store'])->name('poll-templates.store');
+        Route::put('/poll-templates/{pollTemplate}',        [PollTemplateController::class, 'update'])->whereUuid('pollTemplate')->name('poll-templates.update');
+        Route::delete('/poll-templates/{pollTemplate}',     [PollTemplateController::class, 'destroy'])->whereUuid('pollTemplate')->name('poll-templates.destroy');
+        Route::post('/petition-templates',                  [PetitionTemplateController::class, 'store'])->name('petition-templates.store');
+        Route::put('/petition-templates/{petitionTemplate}', [PetitionTemplateController::class, 'update'])->whereUuid('petitionTemplate')->name('petition-templates.update');
+        Route::delete('/petition-templates/{petitionTemplate}', [PetitionTemplateController::class, 'destroy'])->whereUuid('petitionTemplate')->name('petition-templates.destroy');
     });
 
     // ─── Internal SuperAdmin Routes ────────────────────────────────────────

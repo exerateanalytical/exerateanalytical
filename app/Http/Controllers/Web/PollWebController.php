@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\FederationRegion;
 use App\Models\Poll;
+use App\Models\PollTemplate;
 use App\Models\PollVote;
 use App\Models\Reaction;
 use Illuminate\Http\Request;
@@ -37,10 +38,16 @@ class PollWebController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $template = null;
+        if ($request->template_id) {
+            $template = PollTemplate::find($request->template_id);
+        }
+
         return Inertia::render('Civic/Polls/Create', [
-            'regions' => FederationRegion::select('id', 'name', 'code')->orderBy('name')->get(),
+            'regions'  => FederationRegion::select('id', 'name', 'code')->orderBy('name')->get(),
+            'template' => $template,
         ]);
     }
 
