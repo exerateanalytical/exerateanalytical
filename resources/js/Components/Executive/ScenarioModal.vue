@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 
 // ── Props / Emits ─────────────────────────────────────────────────────────────
@@ -14,14 +14,18 @@ const loading   = ref(true);
 const error     = ref(null);
 const scenarios = ref([]);
 const recMeta   = ref(null);
+const rankings  = ref([]);
 
 onMounted(async () => {
     try {
-        const { data } = await axios.get(
-            `/api/v1/executive/recommendations/${props.recommendation.id}/scenarios`
-        );
-        scenarios.value = data.data   ?? [];
-        recMeta.value   = data.recommendation ?? null;
+        const [scenRes, rankRes] = await Promise.all([
+            axios.get(`/api/v1/executive/recommendations/${props.recommendation.id}/scenarios`),
+            axios.get(`/api/v1/executive/recommendations/${props.recommendation.id}/decisions`)
+                .catch(() => ({ data: { data: [] } })),
+        ]);
+        scenarios.value = scenRes.data.data           ?? [];
+        recMeta.value   = scenRes.data.recommendation ?? null;
+        rankings.value  = rankRes.data.data           ?? [];
     } catch {
         error.value = 'Could not load scenario projections. Please try again.';
     } finally {
@@ -134,6 +138,54 @@ const SEVERITY_CLS = {
     low:      'bg-blue-100   text-blue-700   border-blue-200',
 };
 const sevCls = (s) => SEVERITY_CLS[s] ?? SEVERITY_CLS.low;
+
+// ── CT-13 Decision Ranking helpers ────────────────────────────────────────────
+// keyed by scenario_type for O(1) lookup in template
+const rankingByType = computed(() => {
+    const map = {};
+    for (const r of rankings.value) map[r.scenario_type] = r;
+    return map;
+});
+
+function rankingFor(scenarioType) {
+    return rankingByType.value[scenarioType] ?? null;
+}
+
+// Normalise decision_score (range -100..+100) to a 0-100% bar width
+function decisionScoreWidth(score) {
+    return ((score + 100) / 2).toFixed(1) + '%';
+}
+
+function decisionScoreBarCls(score) {
+    if (score >= 20)  return 'bg-emerald-500';
+    if (score >= 0)   return 'bg-amber-400';
+    return 'bg-red-400';
+}
+
+function decisionScoreTextCls(score) {
+    if (score >= 20)  return 'text-emerald-700';
+    if (score >= 0)   return 'text-amber-700';
+    return 'text-red-600';
+}
+
+// Short human-readable impact summary shown under the #1 badge
+function impactSummary(ranking) {
+    const parts = [];
+    if (ranking.projected_stability_delta != null) {
+        const v = Number(ranking.projected_stability_delta);
+        parts.push((v >= 0 ? '+' : '') + v.toFixed(1) + ' stability');
+    }
+    if (ranking.projected_trust_delta != null) {
+        const v = Number(ranking.projected_trust_delta);
+        parts.push((v >= 0 ? '+' : '') + v.toFixed(2) + ' trust');
+    }
+    if (ranking.projected_cascade_delta != null) {
+        const v = Number(ranking.projected_cascade_delta);
+        const dir = v < 0 ? '↓' : v > 0 ? '↑' : '→';
+        parts.push(dir + ' cascade ' + Math.abs(v).toFixed(3));
+    }
+    return parts.join(' · ');
+}
 </script>
 
 <template>
@@ -148,7 +200,7 @@ const sevCls = (s) => SEVERITY_CLS[s] ?? SEVERITY_CLS.low;
 
             <!-- Modal card -->
             <div
-                class="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
+                class="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
                 @click.stop
             >
                 <!-- Header -->
@@ -210,8 +262,13 @@ const sevCls = (s) => SEVERITY_CLS[s] ?? SEVERITY_CLS.low;
                         <div
                             v-for="scenario in scenarios"
                             :key="scenario.id"
-                            class="rounded-xl border overflow-hidden flex flex-col"
-                            :class="smeta(scenario.scenario_type).headerCls"
+                            class="rounded-xl border overflow-hidden flex flex-col transition"
+                            :class="[
+                                smeta(scenario.scenario_type).headerCls,
+                                rankingFor(scenario.scenario_type)?.rank_position === 1
+                                    ? 'ring-2 ring-emerald-400 ring-offset-1'
+                                    : '',
+                            ]"
                         >
                             <!-- Scenario header -->
                             <div class="px-4 py-3 border-b" :class="smeta(scenario.scenario_type).headerCls">
@@ -259,6 +316,51 @@ const sevCls = (s) => SEVERITY_CLS[s] ?? SEVERITY_CLS.low;
                                     </p>
                                     <p class="text-xs text-gray-400 mt-0.5">avg reputation Δ/day</p>
                                 </div>
+
+                                <!-- CT-13 Recommended Action ─────────────────── -->
+                                <template v-if="rankingFor(scenario.scenario_type)">
+                                    <div class="border-t border-gray-100 pt-3 mt-1">
+                                        <!-- #1 Best Choice badge -->
+                                        <div
+                                            v-if="rankingFor(scenario.scenario_type).rank_position === 1"
+                                            class="flex items-center gap-1.5 mb-2"
+                                        >
+                                            <span class="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300">
+                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                                </svg>
+                                                #1 Best Choice
+                                            </span>
+                                        </div>
+                                        <div v-else class="mb-2">
+                                            <span class="text-xs font-semibold text-gray-400">
+                                                #{{ rankingFor(scenario.scenario_type).rank_position }} Ranked
+                                            </span>
+                                        </div>
+
+                                        <!-- Impact summary -->
+                                        <p class="text-xs text-gray-500 leading-snug mb-2">
+                                            {{ impactSummary(rankingFor(scenario.scenario_type)) }}
+                                        </p>
+
+                                        <!-- Decision score bar -->
+                                        <div>
+                                            <div class="flex items-center justify-between mb-1">
+                                                <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Decision Score</span>
+                                                <span :class="['text-xs font-bold tabular-nums', decisionScoreTextCls(rankingFor(scenario.scenario_type).decision_score)]">
+                                                    {{ Number(rankingFor(scenario.scenario_type).decision_score).toFixed(1) }}
+                                                </span>
+                                            </div>
+                                            <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                <div
+                                                    :class="['h-full rounded-full transition-all duration-500', decisionScoreBarCls(rankingFor(scenario.scenario_type).decision_score)]"
+                                                    :style="{ width: decisionScoreWidth(rankingFor(scenario.scenario_type).decision_score) }"
+                                                />
+                                            </div>
+                                            <p class="text-xs text-gray-400 mt-0.5">−100 to +100 scale</p>
+                                        </div>
+                                    </div>
+                                </template>
 
                             </div>
 

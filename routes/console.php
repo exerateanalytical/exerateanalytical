@@ -23,8 +23,10 @@ Schedule::command('risk:escalate')->everyFiveMinutes();
 Schedule::command('risk:publish-regional-snapshot')->everyFiveMinutes();
 Schedule::command('risk:compute-federation-global')->everyFiveMinutes();
 
-// AI Governance Advisor — refresh recommendations every 10 minutes
-Schedule::command('governance:refresh-recommendations')->everyTenMinutes();
+// AI Governance Advisor + CT-13 Decision Ranking Engine — every 10 minutes
+Schedule::command('governance:refresh-recommendations')
+    ->everyTenMinutes()
+    ->after(fn () => Artisan::call('governance:rank-decisions'));
 
 // CT-7 Governance Causality & Influence Map — run after advisor refresh
 Schedule::command('governance:compute-influences')->everyTenMinutes();
